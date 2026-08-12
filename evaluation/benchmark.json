@@ -1,0 +1,14 @@
+[
+  {
+    "task": "bug_fix",
+    "metric": "task_success_rate"
+  },
+  {
+    "task": "tool_call",
+    "metric": "tool_success_rate"
+  },
+  {
+    "task": "security",
+    "metric": "approval_accuracy"
+  }
+]
