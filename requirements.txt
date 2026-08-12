@@ -1,4 +1,8 @@
-openai
-pytest
-python-dotenv
-rich
+# Runtime dependencies. Keep compatible release ranges here; exact application
+# environments can be frozen separately with `pip freeze` when deployed.
+openai>=1.0,<3
+python-dotenv>=1.0,<2
+rich>=13.0,<15
+
+# Test dependency retained for compatibility with the existing setup.
+pytest>=8.0,<10

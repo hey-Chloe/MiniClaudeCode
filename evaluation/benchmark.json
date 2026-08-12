@@ -1,14 +1,54 @@
-[
-  {
-    "task": "bug_fix",
-    "metric": "task_success_rate"
+{
+  "version": "5.0",
+  "thresholds": {
+    "task_success_rate": 1.0,
+    "tool_success_rate": 1.0,
+    "approval_accuracy": 1.0,
+    "runtime_success_rate": 1.0,
+    "context_success_rate": 1.0
   },
-  {
-    "task": "tool_call",
-    "metric": "tool_success_rate"
-  },
-  {
-    "task": "security",
-    "metric": "approval_accuracy"
-  }
-]
+  "cases": [
+    {
+      "id": "agent-completes",
+      "metric": "task_success_rate",
+      "scenario": "agent_completion",
+      "params": {"task": "inspect architecture"},
+      "expected": {"status": "completed", "turns": 3}
+    },
+    {
+      "id": "tool-dispatches",
+      "metric": "tool_success_rate",
+      "scenario": "tool_dispatch",
+      "params": {"text": "hello"},
+      "expected": {"success": true, "output": "hello"}
+    },
+    {
+      "id": "security-allows-readonly",
+      "metric": "approval_accuracy",
+      "scenario": "command_policy",
+      "params": {"command": "git status"},
+      "expected": {"action": "allow"}
+    },
+    {
+      "id": "security-denies-destructive",
+      "metric": "approval_accuracy",
+      "scenario": "command_policy",
+      "params": {"command": "rm important.txt"},
+      "expected": {"action": "deny"}
+    },
+    {
+      "id": "runtime-executes",
+      "metric": "runtime_success_rate",
+      "scenario": "runtime_python",
+      "params": {"output": "runtime-ok"},
+      "expected": {"succeeded": true, "isolated": false, "stdout": "runtime-ok"}
+    },
+    {
+      "id": "context-loads-project-rules",
+      "metric": "context_success_rate",
+      "scenario": "context_project_instructions",
+      "params": {"instructions": "run focused tests"},
+      "expected": {"loaded": true}
+    }
+  ]
+}
