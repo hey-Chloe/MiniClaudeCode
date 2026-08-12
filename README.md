@@ -1,4 +1,5 @@
 # MiniClaudeCode
+# 用python代码完成最小闭环！
 面向 Harness Engineering 的轻量级 Coding Agent Runtime
 
 MiniClaudeCode 是一个针对 Coding 场景设计的轻量级 Agent Runtime。参考 Claude Code、OpenHands 等 Coding Agent 的架构思想。
