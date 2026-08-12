@@ -56,7 +56,7 @@ Windows / Linux GitHub Actions CI
 
 <img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/e51e18d0-c1fd-4b36-9e83-9529755736da" />
 
-式就正常了：
+
 
 ## 快速开始
 
