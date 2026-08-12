@@ -2,9 +2,13 @@ import json
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from evaluation.models import BenchmarkCase
 from evaluation.runner import BenchmarkConfigurationError, BenchmarkRunner
