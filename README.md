@@ -19,11 +19,13 @@ Observation 把真实结果反馈给模型
 ![CI](https://img.shields.io/github/actions/workflow/status/hey-Chloe/MiniClaudeCode/ci.yml?branch=main)
 ![License](https://img.shields.io/badge/License-TBD-lightgrey)
 
-和普通 LLM API 调用的区别
+# 和普通 LLM API 调用的区别
+
   普通调用是 User → LLM → Answer：模型是纯函数，输入 prompt 输出文本，它无法改变世界，也无法感知改变后的世界。让它修
   bug，它只能"猜"哪里错了、"假设"测试会过，因为它看不到文件、跑不了测试。
 
   MiniClaudeCode 把模型放进一个 Harness（围栏+脚手架） 里，变成 User → LLM → Action → Environment → Observation → LLM
+  
 
 # 核心能力
 
