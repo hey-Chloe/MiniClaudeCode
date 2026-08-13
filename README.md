@@ -13,6 +13,8 @@ Security 决定是否允许
 Runtime 负责真实执行
 
 Observation 把真实结果反馈给模型
+
+demo:https://www.bilibili.com/video/BV1ZSgj6uEsy/?spm_id_from=333.1387.homepage.video_card.click&vd_source=102fb68c5f80c92499d6704930157555
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Runtime](https://img.shields.io/badge/Runtime-Local%20%7C%20Docker-green)
 ![LLM](https://img.shields.io/badge/LLM-OpenAI%20Compatible-orange)
