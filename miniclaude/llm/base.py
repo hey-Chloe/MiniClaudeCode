@@ -61,3 +61,10 @@ class LLMProvider(Protocol):
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         """Return one normalized response for a model request."""
+
+    def complete_stream(self, request: LLMRequest):
+        """Optionally yield text deltas for a request.
+
+        The agent loop uses the synchronous ``complete``; streaming is a
+        provider-level capability for callers that want incremental text.
+        """

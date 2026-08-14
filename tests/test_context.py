@@ -1,4 +1,5 @@
 import tempfile
+import json
 import unittest
 from pathlib import Path
 
@@ -142,6 +143,95 @@ class ContextLoopIntegrationTests(unittest.TestCase):
         roles = [message["role"] for message in second.messages]
         self.assertEqual(roles, ["user", "assistant", "tool"])
         self.assertEqual(second.previous_response_id, "resp_1")
+
+
+class CompressionLayerTests(unittest.TestCase):
+    def _manager(self, **overrides):
+        defaults = dict(
+            system_instructions="system",
+            max_chars=100_000,
+        )
+        defaults.update(overrides)
+        return ContextManager(ContextConfig(**defaults))
+
+    def test_stale_snip_drops_superseded_snapshot_tools(self):
+        manager = self._manager()
+        manager.start("task")
+        manager.add_tool(
+            json.dumps({"name": "workspace_diff", "changed_files": ["a.py"]})
+        )
+        manager.add_tool(
+            json.dumps({"name": "workspace_diff", "changed_files": ["a.py", "b.py"]})
+        )
+
+        snapshot = manager.snapshot()
+
+        self.assertEqual(snapshot.compression["stale_sniped"], 1)
+        tool_messages = [m for m in snapshot.messages if m.role == "tool"]
+        self.assertEqual(len(tool_messages), 1)
+        self.assertIn("b.py", tool_messages[0].content)
+
+    def test_stale_snip_keeps_distinct_reads(self):
+        manager = self._manager()
+        manager.start("task")
+        manager.add_tool(json.dumps({"name": "read_file", "path": "a.py"}))
+        manager.add_tool(json.dumps({"name": "read_file", "path": "b.py"}))
+
+        snapshot = manager.snapshot()
+
+        self.assertEqual(snapshot.compression["stale_sniped"], 0)
+        self.assertEqual(
+            len([m for m in snapshot.messages if m.role == "tool"]),
+            2,
+        )
+
+    def test_micro_compact_trims_long_tool_output(self):
+        manager = self._manager(
+            micro_compact_max_chars=100,
+            micro_compact_keep_head=30,
+            micro_compact_keep_tail=20,
+        )
+        manager.start("task")
+        manager.add_tool(json.dumps({"name": "grep_files", "payload": "x" * 500}))
+
+        snapshot = manager.snapshot()
+
+        self.assertEqual(snapshot.compression["micro_compacted"], 1)
+        content = [m for m in snapshot.messages if m.role == "tool"][0].content
+        self.assertIn("...", content)
+        self.assertLess(len(content), 100)
+
+    def test_auto_compact_requires_summarizer(self):
+        manager = self._manager(
+            compression_layers=("stale_snip", "micro_compact", "auto_compact"),
+        )
+        manager.start("task")
+        manager.add_tool(json.dumps({"name": "read_file", "content": "a" * 500}))
+
+        snapshot = manager.snapshot()
+
+        self.assertEqual(snapshot.compression["auto_compacted"], 0)
+
+    def test_auto_compact_summarizes_oldest_tools(self):
+        manager = self._manager(
+            compression_layers=("stale_snip", "micro_compact", "auto_compact"),
+            max_chars=400,
+            summarizer=lambda text: "SUMMARY",
+        )
+        manager.start("task")
+        manager.add_assistant("plan")
+        manager.add_tool(json.dumps({"name": "read_file", "content": "x" * 500}))
+        manager.add_tool(json.dumps({"name": "grep_files", "content": "y" * 500}))
+
+        snapshot = manager.snapshot()
+
+        self.assertEqual(snapshot.compression["auto_compacted"], 1)
+        self.assertGreater(snapshot.compression["chars_removed"], 0)
+
+    def test_unknown_layer_is_rejected(self):
+        manager = self._manager(compression_layers=("magic",))
+        with self.assertRaisesRegex(ValueError, "unknown compression layer"):
+            manager.start("task")
 
 
 if __name__ == "__main__":

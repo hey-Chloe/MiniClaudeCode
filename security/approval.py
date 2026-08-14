@@ -1,6 +1,7 @@
 """Session-scoped human approval handling."""
 
 import json
+import threading
 from collections.abc import Callable
 
 from security.policy import PolicyAction, PolicyDecision, PolicyRequest
@@ -15,6 +16,7 @@ class ApprovalManager:
     def __init__(self, callback: ApprovalCallback | None = None):
         self.callback = callback
         self._approved: set[str] = set()
+        self._lock = threading.Lock()
 
     def authorize(
         self, request: PolicyRequest, decision: PolicyDecision
@@ -25,18 +27,21 @@ class ApprovalManager:
             return False, decision.reason
 
         key = self._key(request)
-        if key in self._approved:
-            return True, "approved earlier in this session"
+        with self._lock:
+            if key in self._approved:
+                return True, "approved earlier in this session"
         if self.callback is None:
             return False, "approval required but no approval callback is configured"
         if not self.callback(request, decision):
             return False, "user denied approval"
 
-        self._approved.add(key)
+        with self._lock:
+            self._approved.add(key)
         return True, "user approved for this session"
 
     def clear(self) -> None:
-        self._approved.clear()
+        with self._lock:
+            self._approved.clear()
 
     @staticmethod
     def _key(request: PolicyRequest) -> str:

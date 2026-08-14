@@ -36,6 +36,7 @@ class ToolDefinition:
     parameters: Mapping[str, Any]
     handler: Callable[..., Any] = field(repr=False, compare=False)
     risk: ToolRisk = ToolRisk.READ_ONLY
+    activation_keywords: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -48,6 +49,11 @@ class ToolDefinition:
             raise TypeError("tool handler must be callable")
         if not isinstance(self.risk, ToolRisk):
             raise TypeError("tool risk must be a ToolRisk")
+        if not all(
+            isinstance(keyword, str) and keyword.strip()
+            for keyword in self.activation_keywords
+        ):
+            raise ValueError("activation keywords must be non-empty strings")
 
     def schema(self) -> dict[str, Any]:
         """Return the provider-neutral function tool schema."""
@@ -72,6 +78,7 @@ class ToolObservation:
     policy_action: str | None = None
     policy_reason: str | None = None
     duration_seconds: float = 0.0
+    arguments: Any = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -83,10 +90,13 @@ class ToolObservation:
             "policy_action": self.policy_action,
             "policy_reason": self.policy_reason,
             "duration_seconds": self.duration_seconds,
+            "arguments": self.arguments,
         }
 
     def model_output(self) -> str:
-        return json.dumps(self.to_dict(), ensure_ascii=False, default=str)
+        payload = self.to_dict()
+        payload.pop("arguments", None)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 class ToolRegistry:
@@ -100,6 +110,7 @@ class ToolRegistry:
         self.tools: dict[str, ToolDefinition] = {}
         self.policy = policy if policy is not None else DefaultSecurityPolicy()
         self.approvals = approvals if approvals is not None else ApprovalManager()
+        self._activated: set[str] | None = None
 
     def register(self, tool: ToolDefinition) -> None:
         if not isinstance(tool, ToolDefinition):
@@ -111,8 +122,54 @@ class ToolRegistry:
     def list_tools(self) -> list[str]:
         return list(self.tools.keys())
 
+    def activate(self, names) -> list[str]:
+        """Union-add tools to the active set; unknown names are ignored."""
+        if self._activated is None:
+            self._activated = set()
+        known = sorted(
+            name for name in names if name in self.tools
+        )
+        self._activated.update(known)
+        return known
+
+    def activate_for_task(self, task: str) -> list[str]:
+        """Activate tools whose keywords appear in the task.
+
+        Falls back to the full toolset when nothing matches, so gating never
+        starves the model of capabilities.
+        """
+        lowered = task.lower()
+        matched = sorted(
+            tool.name
+            for tool in self.tools.values()
+            if tool.activation_keywords
+            and any(
+                keyword in lowered
+                for keyword in tool.activation_keywords
+            )
+        )
+        self._activated = set(matched) if matched else None
+        return matched
+
+    def activate_all(self) -> None:
+        """Clear gating and expose every registered tool."""
+        self._activated = None
+
+    def active_tools(self) -> list[str]:
+        if self._activated is None:
+            return list(self.tools.keys())
+        return [
+            name for name in self.tools if name in self._activated
+        ]
+
     def schemas(self) -> list[dict[str, Any]]:
-        return [tool.schema() for tool in self.tools.values()]
+        if self._activated is None:
+            return [tool.schema() for tool in self.tools.values()]
+        return [
+            tool.schema()
+            for tool in self.tools.values()
+            if tool.name in self._activated
+        ]
 
     def dispatch(self, call_id: str, name: str, arguments: str) -> ToolObservation:
         started = time.monotonic()
@@ -126,6 +183,7 @@ class ToolRegistry:
                 duration_seconds=time.monotonic() - started,
             )
 
+        values = None
         try:
             values = json.loads(arguments or "{}")
             if not isinstance(values, dict):
@@ -143,6 +201,7 @@ class ToolRegistry:
                     policy_action=decision.action.value,
                     policy_reason=reason,
                     duration_seconds=time.monotonic() - started,
+                    arguments=values,
                 )
             output = tool.handler(**values)
             return ToolObservation(
@@ -153,6 +212,7 @@ class ToolRegistry:
                 policy_action=decision.action.value,
                 policy_reason=reason,
                 duration_seconds=time.monotonic() - started,
+                arguments=values,
             )
         except (json.JSONDecodeError, ToolValidationError, TypeError) as exc:
             return ToolObservation(

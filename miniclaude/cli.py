@@ -2,14 +2,22 @@
 
 import argparse
 import json
+import os
 import sys
 import uuid
 from getpass import getpass
+from pathlib import Path
 
 from miniclaude.agent import Agent
 from miniclaude.config import AppConfig
 from miniclaude.context import ContextConfig
-from miniclaude.llm import OpenAIProvider, OpenAIProviderConfig
+from miniclaude.llm import (
+    AnthropicProvider,
+    AnthropicProviderConfig,
+    OpenAIProvider,
+    OpenAIProviderConfig,
+)
+from miniclaude.metrics import CostCalculator, Pricing
 from miniclaude.runtime_tools import create_runtime_tools
 from miniclaude.session import SessionStore
 from runtime import DockerRuntime, LocalProcessRuntime
@@ -33,7 +41,17 @@ def main() -> int:
             return _run_legacy(args.task)
         if not config.model:
             parser.error("v5 mode requires --model or MINICLAUDE_MODEL")
-        return _run_v5(args.task, config, args.json, args.session_id, args.sessions_dir)
+        return _run_v5(
+            args.task,
+            config,
+            args.json,
+            args.session_id,
+            args.sessions_dir,
+            verify=args.verify,
+            tool_gating=not args.no_tool_gating,
+            resume=args.resume,
+            provider=args.provider,
+        )
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -45,6 +63,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=["auto", "v5"], default="auto")
     parser.add_argument("--legacy", action="store_true")
     parser.add_argument("--model")
+    parser.add_argument(
+        "--provider",
+        choices=["auto", "openai", "anthropic"],
+        default="auto",
+    )
     parser.add_argument("--workspace", type=lambda value: __import__("pathlib").Path(value).resolve())
     parser.add_argument("--max-turns", type=int)
     parser.add_argument("--timeout", type=float)
@@ -56,6 +79,21 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--session-id")
     parser.add_argument("--sessions-dir")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="resume an interrupted run from its saved checkpoint",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="run pytest before finalizing when files were edited",
+    )
+    parser.add_argument(
+        "--no-tool-gating",
+        action="store_true",
+        help="send every tool schema on every turn instead of activating a subset",
+    )
     return parser
 
 
@@ -65,33 +103,104 @@ def _run_legacy(task: str) -> int:
     return 0
 
 
-def _run_v5(task: str, config: AppConfig, json_output: bool, session_id=None, sessions_dir=None) -> int:
-    provider = OpenAIProvider(
-        OpenAIProviderConfig(
-            model=config.model or "",
-            api_key=config.api_key,
-            base_url=config.base_url,
-            timeout=config.timeout,
+def _run_v5(
+    task: str,
+    config: AppConfig,
+    json_output: bool,
+    session_id=None,
+    sessions_dir=None,
+    *,
+    verify: bool = False,
+    tool_gating: bool = True,
+    resume: bool = False,
+    provider: str = "auto",
+) -> int:
+    if provider == "anthropic":
+        llm_provider = AnthropicProvider(
+            AnthropicProviderConfig(
+                model=config.model or "",
+                api_key=os.getenv("ANTHROPIC_API_KEY") or config.api_key,
+                base_url=config.base_url,
+                timeout=config.timeout,
+                max_retries=config.max_retries,
+            )
         )
-    )
+    else:
+        llm_provider = OpenAIProvider(
+            OpenAIProviderConfig(
+                model=config.model or "",
+                api_key=config.api_key,
+                base_url=config.base_url,
+                timeout=config.timeout,
+                max_retries=config.max_retries,
+            )
+        )
     runtime_class = DockerRuntime if config.runtime == "docker" else LocalProcessRuntime
     runtime = runtime_class(
         config.workspace,
         default_timeout=config.timeout,
         max_output_chars=config.max_output_chars,
     )
+    cost_calculator = None
+    if (
+        config.input_price_per_million is not None
+        and config.output_price_per_million is not None
+    ):
+        cost_calculator = CostCalculator(
+            {
+                (config.model or ""): Pricing(
+                    input_per_million=config.input_price_per_million,
+                    output_per_million=config.output_price_per_million,
+                )
+            }
+        )
+    skills_dir = Path(__file__).resolve().parents[1] / "skills"
+    verifier = None
+    if verify:
+        def verifier():
+            result = runtime.execute(
+                ["pytest", "-q"],
+                cwd=".",
+                timeout=min(config.timeout, 120.0),
+            )
+            return {
+                "passed": bool(result.succeeded),
+                "output": (
+                    (result.stdout or "")[-4000:]
+                    + "\n"
+                    + (result.stderr or "")[-2000:]
+                ),
+            }
     agent = Agent(
-        provider=provider,
+        provider=llm_provider,
         tools=create_runtime_tools(runtime),
         max_turns=config.max_turns,
         security_policy=PermissionModePolicy(config.permission_mode),
         approval_callback=_approval_callback if config.permission_mode == "default" else None,
-        context_config=ContextConfig(workspace=config.workspace),
+        context_config=ContextConfig(
+            workspace=config.workspace,
+            skills_dir=skills_dir if skills_dir.is_dir() else None,
+        ),
+        cost_calculator=cost_calculator,
+        verifier=verifier,
+        tool_gating=tool_gating,
     )
-    result = agent.run_result(task)
-    if session_id or sessions_dir:
+    store = None
+    if session_id or sessions_dir or resume:
         store = SessionStore(sessions_dir or config.workspace / "sessions")
-        store.save(session_id or str(uuid.uuid4()), result, agent.trace.export_detailed())
+    if resume:
+        if not session_id:
+            raise ValueError("--resume requires --session-id")
+        checkpoint = store.load_checkpoint(session_id)
+        result = agent.resume(task, checkpoint)
+    else:
+        result = agent.run_result(task)
+    if store is not None:
+        resolved_id = session_id or str(uuid.uuid4())
+        store.save(resolved_id, result, agent.trace.export_detailed())
+        if result.status.value != "completed":
+            checkpoint = agent.build_checkpoint(result)
+            store.save_checkpoint(resolved_id, checkpoint)
     if json_output:
         print(json.dumps({
             "status": result.status.value,
@@ -99,13 +208,57 @@ def _run_v5(task: str, config: AppConfig, json_output: bool, session_id=None, se
             "output": result.output,
             "error": result.error,
             "events": result.events,
+            "metrics": result.metrics.to_dict() if result.metrics is not None else None,
+            "skills": list(result.skills),
+            "phases": list(result.phases),
         }, ensure_ascii=False, indent=2, default=str))
     else:
         for event in result.events:
             print(event)
         if result.output is not None:
             print(result.output)
+        if result.metrics is not None:
+            _print_metrics_table(result.metrics)
     return 0 if result.status.value == "completed" else 1
+
+
+def _print_metrics_table(metrics) -> None:
+    """Render run metrics with Rich when available; fall back to JSON."""
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        print(
+            "metrics: "
+            + json.dumps(
+                metrics.to_dict(), ensure_ascii=False, default=str
+            )
+        )
+        return
+    data = metrics.to_dict()
+    table = Table(title="Run metrics")
+    table.add_column("metric", style="cyan")
+    table.add_column("value", style="green")
+    for name in (
+        "turns",
+        "tool_calls",
+        "tool_success_rate",
+        "recovery_rate",
+        "repeated_read_rate",
+        "cache_hit_rate",
+        "average_tools_per_turn",
+        "parallel_batches",
+        "max_parallelism",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "context_truncated",
+        "duration_seconds",
+        "model_name",
+        "cost_usd",
+    ):
+        table.add_row(name, str(data.get(name)))
+    Console().print(table)
 
 
 def _approval_callback(request, decision) -> bool:

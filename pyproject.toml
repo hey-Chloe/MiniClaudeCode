@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "miniclaudecode"
-version = "5.0.0"
+version = "5.2.0"
 description = "A lightweight autonomous coding agent runtime"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "anthropic>=0.40,<1",
     "openai>=1.0,<3",
     "python-dotenv>=1.0,<2",
     "rich>=13.0,<15",
@@ -23,10 +24,14 @@ dev = [
 [project.scripts]
 miniclaude = "miniclaude.cli:main"
 miniclaude-eval = "evaluation.runner:main"
+miniclaude-bench = "evaluation.coding.runner:main"
+miniclaude-report = "evaluation.reporting:main"
+miniclaude-skill-eval = "evaluation.skill_routing:main"
+miniclaude-evolve = "evaluation.evolution:main"
 
 [tool.setuptools.packages.find]
 include = ["miniclaude*", "runtime*", "security*", "evaluation*"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra -p no:cacheprovider"
 testpaths = ["tests"]

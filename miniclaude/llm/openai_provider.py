@@ -1,5 +1,7 @@
 """OpenAI Responses API provider implementation."""
 
+import random
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,12 +23,20 @@ class OpenAIProviderConfig:
     base_url: str | None = None
     timeout: float = 120.0
     instructions: str | None = None
+    max_retries: int = 2
+    retry_base_delay: float = 0.5
+    retry_max_delay: float = 8.0
+    retry_jitter: bool = True
 
     def __post_init__(self) -> None:
         if not self.model.strip():
             raise ValueError("model must be a non-empty string")
         if self.timeout <= 0:
             raise ValueError("timeout must be greater than zero")
+        if self.max_retries < 0:
+            raise ValueError("max_retries must not be negative")
+        if self.retry_base_delay < 0 or self.retry_max_delay < 0:
+            raise ValueError("retry delays must not be negative")
 
 
 class OpenAIProvider:
@@ -69,7 +79,9 @@ class OpenAIProvider:
             parameters["previous_response_id"] = request.previous_response_id
 
         try:
-            response = self.client.responses.create(**parameters)
+            response = self._with_retry(
+                lambda: self.client.responses.create(**parameters)
+            )
             return self._normalize_response(response)
         except LLMProviderError:
             raise
@@ -83,36 +95,20 @@ class OpenAIProvider:
         )
 
     def _complete_chat(self, request: LLMRequest) -> LLMResponse:
-        if request.turn == 0:
-            self._chat_messages = []
-            instructions = "\n\n".join(
-                value
-                for value in (self.config.instructions, request.instructions)
-                if value
-            )
-            if instructions:
-                self._chat_messages.append({"role": "system", "content": instructions})
-            self._chat_messages.append({"role": "user", "content": request.task})
-
-        for output in request.tool_outputs:
-            self._chat_messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": output["call_id"],
-                    "content": output["output"],
-                }
-            )
+        messages = self._prepare_chat_input(request)
 
         parameters: dict[str, Any] = {
             "model": self.config.model,
-            "messages": list(self._chat_messages),
+            "messages": messages,
             "stream": False,
         }
         if request.tools:
             parameters["tools"] = [self._chat_tool(tool) for tool in request.tools]
 
         try:
-            response = self.client.chat.completions.create(**parameters)
+            response = self._with_retry(
+                lambda: self.client.chat.completions.create(**parameters)
+            )
             message = response.choices[0].message
             raw_tool_calls = getattr(message, "tool_calls", None) or []
             tool_calls = tuple(
@@ -162,6 +158,187 @@ class OpenAIProvider:
             raise
         except Exception as exc:
             raise LLMProviderError(f"DeepSeek chat request failed: {exc}") from exc
+
+    def complete_stream(self, request: LLMRequest):
+        """Stream text deltas for one request (Responses or chat path)."""
+        if not isinstance(request, LLMRequest):
+            raise TypeError("request must be an LLMRequest")
+        if self._uses_chat_completions():
+            yield from self._complete_chat_stream(request)
+        else:
+            yield from self._complete_responses_stream(request)
+
+    def _prepare_chat_input(self, request: LLMRequest) -> list[dict[str, Any]]:
+        """Build the chat message list, mutating provider state on turn zero."""
+        if request.turn == 0:
+            self._chat_messages = []
+            instructions = "\n\n".join(
+                value
+                for value in (self.config.instructions, request.instructions)
+                if value
+            )
+            if instructions:
+                self._chat_messages.append(
+                    {"role": "system", "content": instructions}
+                )
+            self._chat_messages.append(
+                {"role": "user", "content": request.task}
+            )
+        for output in request.tool_outputs:
+            self._chat_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": output["call_id"],
+                    "content": output["output"],
+                }
+            )
+        return list(self._chat_messages)
+
+    def _complete_chat_stream(self, request: LLMRequest):
+        messages = self._prepare_chat_input(request)
+        parameters: dict[str, Any] = {
+            "model": self.config.model,
+            "messages": messages,
+            "stream": True,
+        }
+        if request.tools:
+            parameters["tools"] = [
+                self._chat_tool(tool) for tool in request.tools
+            ]
+        try:
+            response = self._with_retry(
+                lambda: self.client.chat.completions.create(**parameters)
+            )
+            parts: list[str] = []
+            for chunk in response:
+                choices = getattr(chunk, "choices", None) or ()
+                if not choices:
+                    continue
+                delta = getattr(choices[0].message, "content", None)
+                if delta:
+                    parts.append(delta)
+                    yield delta
+            content = "".join(parts)
+            if content:
+                self._chat_messages.append(
+                    {"role": "assistant", "content": content}
+                )
+        except LLMProviderError:
+            raise
+        except Exception as exc:
+            raise LLMProviderError(
+                f"DeepSeek chat stream failed: {exc}"
+            ) from exc
+
+    def _complete_responses_stream(self, request: LLMRequest):
+        model_input: Any = request.task
+        if request.tool_outputs:
+            model_input = [
+                {
+                    "type": "function_call_output",
+                    "call_id": output["call_id"],
+                    "output": output["output"],
+                }
+                for output in request.tool_outputs
+            ]
+        parameters: dict[str, Any] = {
+            "model": self.config.model,
+            "input": model_input,
+            "stream": True,
+        }
+        instructions = "\n\n".join(
+            value
+            for value in (self.config.instructions, request.instructions)
+            if value
+        )
+        if instructions:
+            parameters["instructions"] = instructions
+        if request.tools:
+            parameters["tools"] = list(request.tools)
+        if request.previous_response_id:
+            parameters["previous_response_id"] = request.previous_response_id
+        try:
+            response = self._with_retry(
+                lambda: self.client.responses.create(**parameters)
+            )
+            for event in response:
+                if getattr(event, "type", None) != "response.output_text.delta":
+                    continue
+                delta = getattr(event, "delta", None)
+                if delta:
+                    yield delta
+        except LLMProviderError:
+            raise
+        except Exception as exc:
+            raise LLMProviderError(f"OpenAI stream failed: {exc}") from exc
+
+    def restore(self, messages: tuple[dict[str, str], ...]) -> None:
+        """Seed chat-completions history when resuming a session.
+
+        The Responses API path resumes through ``previous_response_id``; this
+        method only matters for the DeepSeek chat adapter, which keeps its own
+        in-memory message list.
+        """
+        self._chat_messages = []
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content")
+            if role in {"user", "assistant", "tool"} and content:
+                self._chat_messages.append(
+                    {"role": role, "content": content}
+                )
+
+    def export_state(self) -> dict[str, Any]:
+        """Export provider-local state (chat history) for checkpointing.
+
+        The chat-completions path needs the exact message list, including
+        assistant ``tool_calls`` and tool ``tool_call_id`` links, to resume
+        without losing the tool-call correlation.
+        """
+        return {
+            "chat_messages": [
+                dict(message) for message in self._chat_messages
+            ]
+        }
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore provider-local state from a checkpoint."""
+        self._chat_messages = [
+            dict(message)
+            for message in state.get("chat_messages", [])
+        ]
+
+    def _with_retry(self, operation):
+        attempt = 0
+        while True:
+            try:
+                return operation()
+            except Exception as exc:
+                attempt += 1
+                if (
+                    attempt > self.config.max_retries
+                    or not self._is_retryable(exc)
+                ):
+                    raise
+                cap = min(
+                    self.config.retry_max_delay,
+                    self.config.retry_base_delay * (2 ** (attempt - 1)),
+                )
+                delay = (
+                    random.uniform(0, cap)
+                    if self.config.retry_jitter
+                    else cap
+                )
+                time.sleep(delay)
+
+    @staticmethod
+    def _is_retryable(exc: Exception) -> bool:
+        if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
+            return True
+        status = getattr(exc, "status_code", None)
+        if isinstance(status, int):
+            return status in {408, 429} or 500 <= status < 600
+        return False
 
     @staticmethod
     def _chat_tool(tool: dict[str, Any]) -> dict[str, Any]:

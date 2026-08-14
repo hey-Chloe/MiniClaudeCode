@@ -1,0 +1,196 @@
+{
+  "version": "1.0",
+  "run_type": "skill_routing",
+  "skills": [
+    "bug-fix",
+    "code-review",
+    "repo-analysis"
+  ],
+  "total": 26,
+  "keyword_hit_rate": 1.0,
+  "hybrid_hit_rate": 1.0,
+  "cases": [
+    {
+      "id": "fix-add-negatives",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "fix-max-empty",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "fix-parse-price",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "fix-off-by-one",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "fix-reverse-in-place",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "fix-case-insensitive-search",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "fix-parse-line",
+      "category": "failing_test_fix",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "feat-chunk",
+      "category": "small_feature",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "feat-unique",
+      "category": "small_feature",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "feat-clamp",
+      "category": "small_feature",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "feat-slugify",
+      "category": "small_feature",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "search-locate-sanitize",
+      "category": "code_search",
+      "expected_skill": "repo-analysis",
+      "keyword_skill": "repo-analysis",
+      "hybrid_skill": "repo-analysis"
+    },
+    {
+      "id": "search-todo",
+      "category": "code_search",
+      "expected_skill": "repo-analysis",
+      "keyword_skill": "repo-analysis",
+      "hybrid_skill": "repo-analysis"
+    },
+    {
+      "id": "search-config-timeout",
+      "category": "code_search",
+      "expected_skill": "repo-analysis",
+      "keyword_skill": "repo-analysis",
+      "hybrid_skill": "repo-analysis"
+    },
+    {
+      "id": "refactor-rename-var",
+      "category": "safe_refactor",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "refactor-extract-helper",
+      "category": "safe_refactor",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "refactor-status-constants",
+      "category": "safe_refactor",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "config-fix-json",
+      "category": "config_repair",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "config-fix-toml",
+      "category": "config_repair",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "config-fix-key",
+      "category": "config_repair",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "dep-missing-import",
+      "category": "dependency_issue",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "dep-wrong-module",
+      "category": "dependency_issue",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "dep-unavailable-dependency",
+      "category": "dependency_issue",
+      "expected_skill": "bug-fix",
+      "keyword_skill": "bug-fix",
+      "hybrid_skill": "bug-fix"
+    },
+    {
+      "id": "sec-deny-rm",
+      "category": "permission_security",
+      "expected_skill": "code-review",
+      "keyword_skill": "code-review",
+      "hybrid_skill": "code-review"
+    },
+    {
+      "id": "sec-path-escape",
+      "category": "permission_security",
+      "expected_skill": "code-review",
+      "keyword_skill": "code-review",
+      "hybrid_skill": "code-review"
+    },
+    {
+      "id": "sec-approval-ask",
+      "category": "permission_security",
+      "expected_skill": "code-review",
+      "keyword_skill": "code-review",
+      "hybrid_skill": "code-review"
+    }
+  ]
+}

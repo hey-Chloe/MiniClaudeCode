@@ -97,6 +97,24 @@ class CliTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 2)
         self.assertIn("requires --model", completed.stderr)
 
+    def test_parser_accepts_resume_and_stream_flags(self):
+        from miniclaude.cli import _parser
+
+        args = _parser().parse_args(
+            [
+                "task",
+                "--resume",
+                "--verify",
+                "--no-tool-gating",
+                "--session-id",
+                "sess-1",
+            ]
+        )
+        self.assertTrue(args.resume)
+        self.assertTrue(args.verify)
+        self.assertTrue(args.no_tool_gating)
+        self.assertEqual(args.session_id, "sess-1")
+
 
 if __name__ == "__main__":
     unittest.main()

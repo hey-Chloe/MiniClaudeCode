@@ -260,17 +260,33 @@ class OpenAIProviderTests(unittest.TestCase):
 
 class LLMDriverIntegrationTests(unittest.TestCase):
     def test_provider_text_completes_agent_loop(self):
-        provider = ScriptedProvider([LLMResponse(text="implemented")])
+        provider = ScriptedProvider(
+            [
+                LLMResponse(text="I will fix the bug."),
+                LLMResponse(text="implemented"),
+            ]
+        )
 
         result = Agent(provider=provider).run_result("fix bug")
 
         self.assertEqual(result.status, RunStatus.COMPLETED)
         self.assertEqual(result.output, "implemented")
-        self.assertEqual(result.turns, 1)
+        self.assertEqual(result.turns, 2)
         self.assertEqual(provider.requests[0].task, "fix bug")
         self.assertEqual(provider.requests[0].turn, 0)
         self.assertTrue(provider.requests[0].instructions)
         self.assertEqual(provider.requests[0].messages[0]["role"], "user")
+        self.assertEqual(result.phases, ("plan", "finalize"))
+
+    def test_provider_text_completes_immediately_without_plan_first(self):
+        provider = ScriptedProvider([LLMResponse(text="implemented")])
+
+        result = Agent(provider=provider, plan_first=False).run_result("fix bug")
+
+        self.assertEqual(result.status, RunStatus.COMPLETED)
+        self.assertEqual(result.output, "implemented")
+        self.assertEqual(result.turns, 1)
+        self.assertEqual(result.phases, ("finalize",))
 
     def test_unregistered_provider_tool_call_is_not_executed(self):
         provider = ScriptedProvider(
@@ -295,6 +311,77 @@ class LLMDriverIntegrationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "either driver or provider"):
             Agent(driver=object(), provider=provider)
+
+
+class StreamingTests(unittest.TestCase):
+    def test_chat_stream_yields_deltas_and_keeps_history(self):
+        def create(**parameters):
+            self.assertTrue(parameters["stream"])
+            return iter(
+                [
+                    SimpleNamespace(
+                        choices=[
+                            SimpleNamespace(
+                                message=SimpleNamespace(content="hel")
+                            )
+                        ]
+                    ),
+                    SimpleNamespace(
+                        choices=[
+                            SimpleNamespace(
+                                message=SimpleNamespace(content="lo")
+                            )
+                        ]
+                    ),
+                ]
+            )
+
+        client = SimpleNamespace(
+            responses=object(),
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create)),
+        )
+        provider = OpenAIProvider(
+            OpenAIProviderConfig(
+                model="deepseek-chat",
+                base_url="https://api.deepseek.com",
+            ),
+            client=client,
+        )
+
+        chunks = list(
+            provider.complete_stream(LLMRequest(task="t", turn=0))
+        )
+
+        self.assertEqual(chunks, ["hel", "lo"])
+        self.assertEqual(
+            provider._chat_messages[-1],
+            {"role": "assistant", "content": "hello"},
+        )
+
+    def test_responses_stream_yields_text_deltas(self):
+        def create(**parameters):
+            self.assertTrue(parameters["stream"])
+            return iter(
+                [
+                    SimpleNamespace(
+                        type="response.output_text.delta", delta="hi"
+                    ),
+                    SimpleNamespace(
+                        type="response.output_text.delta", delta="!"
+                    ),
+                    SimpleNamespace(type="response.completed"),
+                ]
+            )
+
+        client = SimpleNamespace(responses=SimpleNamespace(create=create))
+        provider = OpenAIProvider(
+            OpenAIProviderConfig(model="m"),
+            client=client,
+        )
+
+        chunks = list(provider.complete_stream(LLMRequest(task="t")))
+
+        self.assertEqual(chunks, ["hi", "!"])
 
 
 if __name__ == "__main__":

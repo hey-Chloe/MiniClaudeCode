@@ -5,6 +5,8 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
+from git.diff import generate_diff
+from miniclaude.memory import FileCache
 from miniclaude.tools import ToolDefinition
 from runtime.base import Runtime
 from security.policy import ToolRisk
@@ -17,7 +19,9 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
         return runtime.execute(argv, cwd=cwd, timeout=timeout).to_dict()
 
     workspace = runtime.info.workspace
+    initial_files = _snapshot_workspace(workspace)
     git_workspace = "/workspace" if runtime.info.name == "docker" else str(workspace)
+    cache = FileCache()
 
     def git_command(*arguments: str):
         return ["git", "-c", f"safe.directory={git_workspace}", *arguments]
@@ -73,7 +77,36 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
         if count != 1:
             raise ValueError(f"old text must match exactly once; found {count}")
         runtime.write_text(path, content.replace(old, new, 1))
+        cache.invalidate(path)
         return {"path": path, "replacements": 1}
+
+    def read_file(path: str):
+        """Read with a freshness-checked cache; reports ``cache_hit``."""
+        target = _resolve(runtime, path)
+        try:
+            stat_result = target.stat()
+            cached = cache.get(path, stat_result.st_mtime, stat_result.st_size)
+            if cached is not None:
+                return {
+                    "path": path,
+                    "content": cached,
+                    "cache_hit": True,
+                }
+        except OSError:
+            stat_result = None
+        content = runtime.read_text(path)
+        if stat_result is not None:
+            cache.put(path, stat_result.st_mtime, stat_result.st_size, content)
+        return {
+            "path": path,
+            "content": content,
+            "cache_hit": False,
+        }
+
+    def write_file(path: str, content: str):
+        result = runtime.write_text(path, content)
+        cache.invalidate(path)
+        return result
 
     def git_status():
         return _require_success(
@@ -87,12 +120,39 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
             "git diff",
         )
 
+    def workspace_diff():
+        current = _snapshot_workspace(workspace)
+        changed = [
+            relative
+            for relative in sorted(set(initial_files) | set(current))
+            if initial_files.get(relative) != current.get(relative)
+        ]
+        sections = [
+            generate_diff(
+                initial_files.get(relative, ""),
+                current.get(relative, ""),
+                path=relative,
+            )
+            for relative in changed
+        ]
+        return {
+            "changed_files": changed,
+            "diff": "\n".join(sections),
+        }
+
     return [
         ToolDefinition(
             name="list_directory",
             description="List direct children of a workspace directory.",
             parameters=_object_schema({"path": {"type": "string"}}),
             handler=list_directory,
+            activation_keywords=(
+                "list",
+                "directory",
+                "structure",
+                "explore",
+                "tree",
+            ),
         ),
         ToolDefinition(
             name="glob_files",
@@ -102,6 +162,7 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
                 ["pattern"],
             ),
             handler=glob_files,
+            activation_keywords=("glob", "pattern", "find", "search"),
         ),
         ToolDefinition(
             name="grep_files",
@@ -111,18 +172,23 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
                 ["pattern"],
             ),
             handler=grep_files,
+            activation_keywords=("grep", "search", "pattern", "find", "regex"),
         ),
         ToolDefinition(
             name="read_file",
-            description="Read a UTF-8 text file inside the workspace.",
+            description=(
+                "Read a UTF-8 text file inside the workspace; repeated reads "
+                "of an unchanged file are served from a freshness-checked cache."
+            ),
             parameters={
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": False,
             },
-            handler=runtime.read_text,
+            handler=read_file,
             risk=ToolRisk.READ_ONLY,
+            activation_keywords=("read", "inspect", "view", "show", "open"),
         ),
         ToolDefinition(
             name="write_file",
@@ -136,8 +202,9 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
                 "required": ["path", "content"],
                 "additionalProperties": False,
             },
-            handler=runtime.write_text,
+            handler=write_file,
             risk=ToolRisk.MUTATING,
+            activation_keywords=("write", "create", "new", "save", "add"),
         ),
         ToolDefinition(
             name="replace_text",
@@ -148,6 +215,14 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
             ),
             handler=replace_text,
             risk=ToolRisk.MUTATING,
+            activation_keywords=(
+                "replace",
+                "edit",
+                "modify",
+                "change",
+                "refactor",
+                "fix",
+            ),
         ),
         ToolDefinition(
             name="execute_command",
@@ -170,18 +245,40 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
             },
             handler=execute_command,
             risk=ToolRisk.MUTATING,
+            activation_keywords=(
+                "run",
+                "execute",
+                "command",
+                "test",
+                "pytest",
+                "install",
+                "build",
+                "python",
+            ),
         ),
         ToolDefinition(
             name="git_status",
             description="Return git status --short for the workspace.",
             parameters=_object_schema({}),
             handler=git_status,
+            activation_keywords=("git", "status"),
         ),
         ToolDefinition(
             name="git_diff",
             description="Return the current unstaged git diff.",
             parameters=_object_schema({}),
             handler=git_diff,
+            activation_keywords=("git", "diff"),
+        ),
+        ToolDefinition(
+            name="workspace_diff",
+            description=(
+                "Return the unified diff of files changed since this session "
+                "started, excluding caches."
+            ),
+            parameters=_object_schema({}),
+            handler=workspace_diff,
+            activation_keywords=("diff", "change", "workspace", "modified"),
         ),
     ]
 
@@ -209,3 +306,24 @@ def _object_schema(properties, required=None):
         "required": required or [],
         "additionalProperties": False,
     }
+
+
+def _snapshot_workspace(workspace: Path) -> dict[str, str]:
+    files: dict[str, str] = {}
+    for path in sorted(workspace.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(workspace).as_posix()
+        parts = relative.split("/")
+        if (
+            "__pycache__" in parts
+            or ".pytest_cache" in parts
+            or relative.endswith(".pyc")
+            or parts[0] == "hidden_tests"
+            or parts[0] in {".git", ".venv", "venv", "node_modules"}
+        ):
+            continue
+        files[relative] = path.read_text(
+            encoding="utf-8", errors="replace"
+        )
+    return files

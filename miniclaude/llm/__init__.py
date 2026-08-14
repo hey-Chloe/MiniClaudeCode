@@ -9,6 +9,10 @@ from miniclaude.llm.base import (
     LLMUsage,
 )
 from miniclaude.llm.openai_provider import OpenAIProvider, OpenAIProviderConfig
+from miniclaude.llm.anthropic_provider import (
+    AnthropicProvider,
+    AnthropicProviderConfig,
+)
 
 __all__ = [
     "LLMProvider",
@@ -19,5 +23,7 @@ __all__ = [
     "LLMUsage",
     "OpenAIProvider",
     "OpenAIProviderConfig",
+    "AnthropicProvider",
+    "AnthropicProviderConfig",
 ]
 

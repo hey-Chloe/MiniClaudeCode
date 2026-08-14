@@ -137,7 +137,8 @@ class RuntimeToolTests(unittest.TestCase):
             )
 
             self.assertTrue(read.success)
-            self.assertEqual(read.output, "hello")
+            self.assertEqual(read.output["content"], "hello")
+            self.assertFalse(read.output["cache_hit"])
             self.assertFalse(write.success)
             self.assertFalse((Path(directory) / "output.txt").exists())
 

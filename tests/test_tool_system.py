@@ -119,6 +119,97 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertIn("boom", result.error)
 
 
+class ToolActivationTests(unittest.TestCase):
+    def _registry(self):
+        def handler():
+            return {}
+
+        registry = ToolRegistry()
+        registry.register(
+            ToolDefinition(
+                name="read_file",
+                description="Read a file.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=handler,
+                activation_keywords=("read", "inspect"),
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                name="execute_command",
+                description="Run a command.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=handler,
+                activation_keywords=("run", "pytest"),
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                name="plain",
+                description="No keywords.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=handler,
+            )
+        )
+        return registry
+
+    def test_activate_for_task_selects_matching_tools(self):
+        registry = self._registry()
+
+        activated = registry.activate_for_task("read the file and run pytest")
+
+        self.assertEqual(activated, ["execute_command", "read_file"])
+        self.assertEqual(
+            [schema["name"] for schema in registry.schemas()],
+            ["read_file", "execute_command"],
+        )
+
+    def test_activate_for_task_falls_back_to_all(self):
+        registry = self._registry()
+
+        activated = registry.activate_for_task("unrelated task")
+
+        self.assertEqual(activated, [])
+        self.assertEqual(len(registry.schemas()), 3)
+
+    def test_activate_unions_and_expands_active_set(self):
+        registry = self._registry()
+        registry.activate_for_task("read the file")
+
+        registry.activate(["plain"])
+
+        self.assertEqual(
+            [schema["name"] for schema in registry.schemas()],
+            ["read_file", "plain"],
+        )
+
+    def test_activate_all_restores_full_set(self):
+        registry = self._registry()
+        registry.activate_for_task("read the file")
+
+        registry.activate_all()
+
+        self.assertEqual(len(registry.schemas()), 3)
+        self.assertEqual(registry.active_tools(), ["read_file", "execute_command", "plain"])
+
+    def test_unknown_activation_names_are_ignored(self):
+        registry = self._registry()
+        registry.activate(["missing"])
+        self.assertEqual(registry.active_tools(), [])
+
+
 class ToolLoopIntegrationTests(unittest.TestCase):
     def test_tool_result_is_returned_to_provider(self):
         provider = ScriptedProvider(
@@ -150,6 +241,90 @@ class ToolLoopIntegrationTests(unittest.TestCase):
         Agent(provider=provider, tools=[echo_tool()]).run_result("inspect tools")
 
         self.assertEqual(provider.requests[0].tools[0]["name"], "echo")
+
+    def test_tool_gating_limits_schemas_to_matching_tools(self):
+        registry_tools = [
+            ToolDefinition(
+                name="read_file",
+                description="Read a file.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=lambda: {},
+                activation_keywords=("read",),
+            ),
+            ToolDefinition(
+                name="execute_command",
+                description="Run a command.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=lambda: {},
+                activation_keywords=("run",),
+            ),
+        ]
+        provider = ScriptedProvider(
+            [
+                LLMResponse(text="I will read the file."),
+                LLMResponse(text="done"),
+            ]
+        )
+
+        Agent(provider=provider, tools=registry_tools).run_result(
+            "read the file"
+        )
+
+        self.assertEqual(
+            [tool["name"] for tool in provider.requests[0].tools],
+            ["read_file"],
+        )
+
+    def test_tool_gating_can_be_disabled(self):
+        provider = ScriptedProvider(
+            [
+                LLMResponse(text="I will read the file."),
+                LLMResponse(text="done"),
+            ]
+        )
+        tools = [
+            ToolDefinition(
+                name="read_file",
+                description="Read a file.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=lambda: {},
+                activation_keywords=("read",),
+            ),
+            ToolDefinition(
+                name="execute_command",
+                description="Run a command.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                handler=lambda: {},
+                activation_keywords=("run",),
+            ),
+        ]
+
+        Agent(
+            provider=provider,
+            tools=tools,
+            tool_gating=False,
+        ).run_result("read the file")
+
+        self.assertEqual(
+            [tool["name"] for tool in provider.requests[0].tools],
+            ["read_file", "execute_command"],
+        )
 
 
 if __name__ == "__main__":

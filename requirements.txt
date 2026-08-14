@@ -1,5 +1,6 @@
 # Runtime dependencies. Keep compatible release ranges here; exact application
 # environments can be frozen separately with `pip freeze` when deployed.
+anthropic>=0.40,<1
 openai>=1.0,<3
 python-dotenv>=1.0,<2
 rich>=13.0,<15

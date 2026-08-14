@@ -25,7 +25,7 @@ class BenchmarkRunnerTests(unittest.TestCase):
         project = tomllib.loads(
             (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
-        self.assertEqual(__version__, "5.0.0")
+        self.assertEqual(__version__, "5.2.0")
         self.assertEqual(project["project"]["version"], __version__)
 
     def test_repository_benchmark_passes(self):

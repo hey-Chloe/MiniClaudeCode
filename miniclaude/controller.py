@@ -1,8 +1,16 @@
 """Bounded state machine that owns the MiniClaudeCode agent loop."""
 
+import time
 from typing import Protocol
 
-from miniclaude.models import AgentResult, AgentState, LoopDecision, RunStatus
+from miniclaude.metrics import RunMetrics
+from miniclaude.models import (
+    AgentPhase,
+    AgentResult,
+    AgentState,
+    LoopDecision,
+    RunStatus,
+)
 from miniclaude.trace import Trace
 
 
@@ -21,9 +29,14 @@ class CompatibilityLoopDriver:
     """Deterministic driver preserving the v4.1 command-line behavior."""
 
     _STEPS = (
-        LoopDecision("planning", "create plan"),
-        LoopDecision("tool_selection", "pytest"),
-        LoopDecision("verification", "passed", terminal=True),
+        LoopDecision("planning", "create plan", phase=AgentPhase.PLAN),
+        LoopDecision("tool_selection", "pytest", phase=AgentPhase.ACT),
+        LoopDecision(
+            "verification",
+            "passed",
+            terminal=True,
+            phase=AgentPhase.VERIFY,
+        ),
     )
 
     def next(self, state: AgentState) -> LoopDecision:
@@ -42,14 +55,31 @@ class AgentController:
         self.driver = driver
         self.max_turns = max_turns
 
-    def run(self, task: str, trace: Trace | None = None) -> AgentResult:
+    def run(
+        self,
+        task: str,
+        trace: Trace | None = None,
+        *,
+        initial_state: AgentState | None = None,
+    ) -> AgentResult:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be a non-empty string")
 
         current_trace = trace if trace is not None else Trace()
-        current_trace.clear()
-        current_trace.add("task", task)
-        state = AgentState(task=task, max_turns=self.max_turns, status=RunStatus.RUNNING)
+        if initial_state is not None:
+            if initial_state.task != task:
+                raise ValueError("initial state does not match the task")
+            state = initial_state
+            current_trace.add("resumed", {"turn_count": state.turn_count})
+        else:
+            current_trace.clear()
+            current_trace.add("task", task)
+            state = AgentState(
+                task=task,
+                max_turns=self.max_turns,
+                status=RunStatus.RUNNING,
+            )
+        started = time.monotonic()
 
         while state.turn_count < state.max_turns:
             try:
@@ -58,21 +88,26 @@ class AgentController:
                 state.status = RunStatus.FAILED
                 state.error = str(exc)
                 current_trace.add("error", state.error)
-                return self._result(state, current_trace)
+                return self._result(state, current_trace, started)
 
             self._validate_decision(decision)
             state.turn_count += 1
+            state.phases.append(decision.phase.value)
             current_trace.add(decision.event, decision.detail)
+            if decision.event == "tool_results":
+                self._record_file_modifications(current_trace, decision.detail)
+            if state.turn_count == 1 and state.skills_loaded:
+                current_trace.add("skill_loaded", list(state.skills_loaded))
 
             if decision.terminal:
                 state.status = RunStatus.COMPLETED
                 state.output = decision.detail
-                return self._result(state, current_trace)
+                return self._result(state, current_trace, started)
 
         state.status = RunStatus.MAX_TURNS
         state.error = f"maximum turn limit reached ({state.max_turns})"
         current_trace.add("termination", state.error)
-        return self._result(state, current_trace)
+        return self._result(state, current_trace, started)
 
     @staticmethod
     def _validate_decision(decision: LoopDecision) -> None:
@@ -82,7 +117,26 @@ class AgentController:
             raise ValueError("loop decision event must not be empty")
 
     @staticmethod
-    def _result(state: AgentState, trace: Trace) -> AgentResult:
+    def _record_file_modifications(trace: Trace, detail) -> None:
+        """Derive explicit file-modification events from tool observations."""
+        for observation in detail or []:
+            name = observation.get("name")
+            if name not in {"write_file", "replace_text"}:
+                continue
+            if not observation.get("success"):
+                continue
+            arguments = observation.get("arguments") or {}
+            path = arguments.get("path") if isinstance(arguments, dict) else None
+            if isinstance(path, str):
+                trace.add(
+                    "file_modified",
+                    {"tool": name, "path": path},
+                )
+
+    @staticmethod
+    def _result(
+        state: AgentState, trace: Trace, started: float
+    ) -> AgentResult:
         return AgentResult(
             status=state.status,
             task=state.task,
@@ -90,5 +144,9 @@ class AgentController:
             output=state.output,
             error=state.error,
             events=trace.export(),
+            metrics=RunMetrics.from_run(state, trace, started),
+            skills=tuple(state.skills_loaded),
+            phases=tuple(state.phases),
+            provider_response_id=state.provider_response_id,
         )
 

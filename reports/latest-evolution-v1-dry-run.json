@@ -1,0 +1,107 @@
+{
+  "version": "1.0",
+  "run_type": "evolution_dry_run",
+  "base_version": "v1",
+  "candidates": [
+    {
+      "version": "v1",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-skill_top_k-2",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-context_max_chars-24000",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 24000
+      }
+    },
+    {
+      "version": "cand-context_max_chars-40000",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 40000
+      }
+    },
+    {
+      "version": "cand-micro_compact_max_chars-2000",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-micro_compact_max_chars-8000",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-retry_max_retries-1",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-retry_max_retries-3",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-retry_base_delay-0.2",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    },
+    {
+      "version": "cand-retry_base_delay-1.0",
+      "estimate": {
+        "task": "sample task",
+        "tools_sent": 2,
+        "tools_total": 10,
+        "schema_chars": 657,
+        "history_budget": 32000
+      }
+    }
+  ]
+}
