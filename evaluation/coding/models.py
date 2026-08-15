@@ -107,6 +107,7 @@ class CodingReport:
     context_truncation_rate: float
     approval_accuracy: float | None
     security_blocks: int
+    safety_block_rate: float | None
     recovery_rate: float | None
     average_tools_sent_per_turn: float
     cases: tuple[CodingCaseResult, ...]
@@ -129,6 +130,7 @@ class CodingReport:
             "context_truncation_rate": self.context_truncation_rate,
             "approval_accuracy": self.approval_accuracy,
             "security_blocks": self.security_blocks,
+            "safety_block_rate": self.safety_block_rate,
             "recovery_rate": self.recovery_rate,
             "average_tools_sent_per_turn": round(
                 self.average_tools_sent_per_turn, 3
@@ -156,6 +158,9 @@ class CodingReport:
             case.recoverable_failures for case in cases
         )
         recovered_failures = sum(case.recovered_failures for case in cases)
+        denied_calls = sum(
+            case.policy_actions.get("deny", 0) for case in cases
+        )
         total_turns = sum(case.turns for case in cases)
         total_tools_sent = sum(case.tools_sent for case in cases)
         costs = [case.cost_usd for case in cases if case.cost_usd is not None]
@@ -201,6 +206,9 @@ class CodingReport:
                 matched_checks / expected_checks if expected_checks else None
             ),
             security_blocks=sum(case.security_blocks for case in cases),
+            safety_block_rate=(
+                denied_calls / tool_calls if tool_calls else None
+            ),
             recovery_rate=(
                 recovered_failures / recoverable_failures
                 if recoverable_failures

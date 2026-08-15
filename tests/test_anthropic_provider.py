@@ -77,6 +77,37 @@ class AnthropicProviderTests(unittest.TestCase):
         self.assertEqual(response.tool_calls[0].name, "echo")
         self.assertIn('"text"', response.tool_calls[0].arguments)
 
+    def test_complete_stream_yields_text_deltas(self):
+        provider, calls = self._provider(
+            [
+                iter(
+                    [
+                        {"type": "message_start"},
+                        {
+                            "type": "content_block_delta",
+                            "delta": {"type": "text_delta", "text": "hel"},
+                        },
+                        {
+                            "type": "content_block_delta",
+                            "delta": {"type": "text_delta", "text": "lo"},
+                        },
+                        {
+                            "type": "content_block_delta",
+                            "delta": {"type": "input_json_delta", "partial_json": "{}"},
+                        },
+                        {"type": "message_stop"},
+                    ]
+                )
+            ]
+        )
+
+        deltas = list(
+            provider.complete_stream(LLMRequest(task="hi"))
+        )
+
+        self.assertEqual(deltas, ["hel", "lo"])
+        self.assertTrue(calls[0]["stream"])
+
     def test_tool_results_are_attached_to_tool_use_blocks(self):
         provider, calls = self._provider(
             [

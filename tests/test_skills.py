@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from miniclaude.agent import Agent
 from miniclaude.context import ContextConfig, ContextManager
@@ -116,6 +117,33 @@ class SkillRegistryTests(unittest.TestCase):
 
 
 class ContextSkillsTests(unittest.TestCase):
+    def test_routing_mode_is_passed_to_selector(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = _write_skills(Path(directory))
+            manager = ContextManager(
+                ContextConfig(
+                    system_instructions="system",
+                    skills_dir=root,
+                    routing_mode="semantic",
+                )
+            )
+            with mock.patch.object(
+                SkillRegistry,
+                "select",
+                wraps=manager._registry.select,
+            ) as select:
+                manager.start("fix the failing pytest test")
+
+            select.assert_called_once()
+            self.assertEqual(
+                select.call_args.kwargs.get("mode"),
+                "semantic",
+            )
+
+    def test_invalid_routing_mode_is_rejected(self):
+        with self.assertRaises(ValueError):
+            ContextConfig(routing_mode="vector")
+
     def test_matching_skill_is_injected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = _write_skills(Path(directory))

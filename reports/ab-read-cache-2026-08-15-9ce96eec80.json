@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "run_type": "ab_read_cache",
+  "note": "Offline replay of a deterministic repeated-read session through the real read_file tool; wall-clock medians on this machine.",
+  "session": {
+    "calls": 50,
+    "repeats": 5
+  },
+  "results": {
+    "cache_off": {
+      "total_reads": 48,
+      "repeated_reads": 42,
+      "cache_hits": 0,
+      "repeated_read_rate": 0.875,
+      "cache_hit_rate": 0.0,
+      "median_seconds": 0.123126,
+      "samples_seconds": [
+        0.135165,
+        0.093973,
+        0.123126,
+        0.138385,
+        0.057783
+      ]
+    },
+    "cache_on": {
+      "total_reads": 48,
+      "repeated_reads": 42,
+      "cache_hits": 45,
+      "repeated_read_rate": 0.875,
+      "cache_hit_rate": 0.9375,
+      "median_seconds": 0.045543,
+      "samples_seconds": [
+        0.045543,
+        0.043402,
+        0.069373,
+        0.08076,
+        0.04497
+      ]
+    },
+    "cache_hit_rate_on": 0.9375,
+    "repeated_read_rate_off": 0.875,
+    "repeated_read_rate_on": 0.875,
+    "time_saved_pct": 63.01
+  }
+}

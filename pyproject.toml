@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "miniclaudecode"
-version = "5.2.0"
+version = "5.3.0"
 description = "A lightweight autonomous coding agent runtime"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,9 +25,14 @@ dev = [
 miniclaude = "miniclaude.cli:main"
 miniclaude-eval = "evaluation.runner:main"
 miniclaude-bench = "evaluation.coding.runner:main"
+miniclaude-bench-async = "evaluation.coding.async_runner:main"
 miniclaude-report = "evaluation.reporting:main"
 miniclaude-skill-eval = "evaluation.skill_routing:main"
 miniclaude-evolve = "evaluation.evolution:main"
+miniclaude-stress = "evaluation.stress:main"
+miniclaude-ab-gating = "evaluation.ab_tool_gating:main"
+miniclaude-ab-concurrency = "evaluation.ab_concurrency:main"
+miniclaude-ab-read-cache = "evaluation.ab_read_cache:main"
 
 [tool.setuptools.packages.find]
 include = ["miniclaude*", "runtime*", "security*", "evaluation*"]

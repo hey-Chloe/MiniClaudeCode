@@ -300,8 +300,8 @@ class LLMDriverIntegrationTests(unittest.TestCase):
         result = Agent(provider=provider, max_turns=1).run_result("inspect")
 
         self.assertEqual(result.status, RunStatus.MAX_TURNS)
-        self.assertEqual(result.events[1]["event"], "tool_results")
-        observation = result.events[1]["detail"][0]
+        self.assertEqual(result.events[1]["event"], "tool_calls")
+        observation = result.events[2]["detail"][0]
         self.assertEqual(observation["name"], "read_file")
         self.assertFalse(observation["success"])
         self.assertIn("unknown tool", observation["error"])

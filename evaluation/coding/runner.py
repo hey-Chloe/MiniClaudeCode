@@ -16,7 +16,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from evaluation.coding.checkers import (
     CHECKERS,
@@ -148,6 +148,7 @@ def _run_live_case(
     cost_calculator: CostCalculator | None,
     auto_approve: bool,
     strategy=None,
+    provider_factory: Callable[[], Any] | None = None,
 ) -> CodingCaseResult:
     with tempfile.TemporaryDirectory() as directory:
         workspace = Path(directory)
@@ -169,27 +170,37 @@ def _run_live_case(
                 default_timeout=timeout,
             )
         )
-        provider = OpenAIProvider(
-            OpenAIProviderConfig(
-                model=model,
-                api_key=api_key,
-                base_url=base_url,
-                timeout=timeout,
-                max_retries=max_retries,
-                retry_base_delay=(
-                    strategy.retry_base_delay
-                    if strategy is not None
-                    else 0.5
-                ),
+        if provider_factory is not None:
+            provider = provider_factory()
+        else:
+            provider = OpenAIProvider(
+                OpenAIProviderConfig(
+                    model=model,
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=timeout,
+                    max_retries=max_retries,
+                    retry_base_delay=(
+                        strategy.retry_base_delay
+                        if strategy is not None
+                        else 0.5
+                    ),
+                )
             )
-        )
 
         def approve(request, decision) -> bool:
             return True
 
         agent = Agent(
             provider=provider,
-            tools=create_runtime_tools(runtime),
+            tools=create_runtime_tools(
+                runtime,
+                cache_enabled=(
+                    strategy.read_cache_enabled
+                    if strategy is not None
+                    else True
+                ),
+            ),
             max_turns=max_turns,
             security_policy=PermissionModePolicy(permission_mode),
             approval_callback=approve if auto_approve else None,
@@ -298,6 +309,9 @@ def _context_config(strategy, workspace: Path, skills_dir):
             strategy.context_max_chars if strategy is not None else 32_000
         ),
         max_skills=strategy.skill_top_k if strategy is not None else 1,
+        routing_mode=(
+            strategy.routing_mode if strategy is not None else "hybrid"
+        ),
         micro_compact_max_chars=(
             strategy.micro_compact_max_chars
             if strategy is not None

@@ -45,6 +45,7 @@ class ContextConfig:
     skills_dir: Path | None = None
     skill_budget_chars: int = 8_000
     max_skills: int = 1
+    routing_mode: str = "hybrid"
     compression_layers: tuple[str, ...] = ("stale_snip", "micro_compact")
     micro_compact_max_chars: int = 4_000
     micro_compact_keep_head: int = 1_500
@@ -62,6 +63,10 @@ class ContextConfig:
             raise ValueError("skill_budget_chars must not be negative")
         if self.max_skills < 1:
             raise ValueError("max_skills must be at least 1")
+        if self.routing_mode not in {"keyword", "hybrid", "semantic"}:
+            raise ValueError(
+                "routing_mode must be one of keyword/hybrid/semantic"
+            )
         if self.micro_compact_max_chars < 1:
             raise ValueError("micro_compact_max_chars must be positive")
         if self.micro_compact_keep_head < 0 or self.micro_compact_keep_tail < 0:
@@ -296,7 +301,9 @@ class ContextManager:
 
     def _append_skills(self, task: str, base: str) -> str:
         selected = self._registry.select(
-            task, top_k=self.config.max_skills
+            task,
+            top_k=self.config.max_skills,
+            mode=self.config.routing_mode,
         )
         if not selected:
             return base

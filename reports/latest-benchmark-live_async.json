@@ -1,0 +1,256 @@
+{
+  "version": "1.0",
+  "run_type": "live_async",
+  "model": "deepseek-chat",
+  "total": 6,
+  "passed": 6,
+  "task_success_rate": 1.0,
+  "tool_success_rate": 0.9393939393939394,
+  "first_pass_rate": 0.5,
+  "average_turns": 5.833,
+  "average_tokens": 11265.2,
+  "average_latency_seconds": 14.007,
+  "total_cost_usd": null,
+  "repeated_read_rate": 0.1111111111111111,
+  "context_truncation_rate": 0.0,
+  "approval_accuracy": null,
+  "security_blocks": 1,
+  "safety_block_rate": 0.030303030303030304,
+  "recovery_rate": 1.0,
+  "average_tools_sent_per_turn": 7.886,
+  "cases": [
+    {
+      "id": "fix-add-negatives",
+      "category": "failing_test_fix",
+      "status": "completed",
+      "passed": true,
+      "checks": {
+        "tests_pass": true
+      },
+      "turns": 7,
+      "tool_calls": 7,
+      "tool_successes": 7,
+      "tool_success_rate": 1.0,
+      "policy_actions": {
+        "allow": 4,
+        "ask": 3
+      },
+      "total_reads": 2,
+      "repeated_reads": 0,
+      "repeated_read_rate": 0.0,
+      "input_tokens": 13757,
+      "output_tokens": 504,
+      "total_tokens": 14261,
+      "context_truncated": false,
+      "latency_seconds": 27.844,
+      "cost_usd": null,
+      "skills_loaded": [
+        "bug-fix"
+      ],
+      "first_pass": true,
+      "security_blocks": 0,
+      "policy_checks_matched": 0,
+      "policy_checks_total": 0,
+      "recoverable_failures": 0,
+      "recovered_failures": 0,
+      "recovery_rate": null,
+      "tools_sent": 56,
+      "error": null
+    },
+    {
+      "id": "feat-clamp",
+      "category": "small_feature",
+      "status": "completed",
+      "passed": true,
+      "checks": {
+        "hidden_tests_pass": true
+      },
+      "turns": 6,
+      "tool_calls": 5,
+      "tool_successes": 5,
+      "tool_success_rate": 1.0,
+      "policy_actions": {
+        "allow": 3,
+        "ask": 2
+      },
+      "total_reads": 1,
+      "repeated_reads": 0,
+      "repeated_read_rate": 0.0,
+      "input_tokens": 9981,
+      "output_tokens": 578,
+      "total_tokens": 10559,
+      "context_truncated": false,
+      "latency_seconds": 11.232,
+      "cost_usd": null,
+      "skills_loaded": [
+        "bug-fix"
+      ],
+      "first_pass": false,
+      "security_blocks": 0,
+      "policy_checks_matched": 0,
+      "policy_checks_total": 0,
+      "recoverable_failures": 0,
+      "recovered_failures": 0,
+      "recovery_rate": null,
+      "tools_sent": 48,
+      "error": null
+    },
+    {
+      "id": "config-fix-json",
+      "category": "config_repair",
+      "status": "completed",
+      "passed": true,
+      "checks": {
+        "json_valid": true
+      },
+      "turns": 5,
+      "tool_calls": 4,
+      "tool_successes": 3,
+      "tool_success_rate": 0.75,
+      "policy_actions": {
+        "allow": 1,
+        "ask": 2
+      },
+      "total_reads": 1,
+      "repeated_reads": 0,
+      "repeated_read_rate": 0.0,
+      "input_tokens": 8016,
+      "output_tokens": 387,
+      "total_tokens": 8403,
+      "context_truncated": false,
+      "latency_seconds": 9.433,
+      "cost_usd": null,
+      "skills_loaded": [
+        "bug-fix"
+      ],
+      "first_pass": false,
+      "security_blocks": 0,
+      "policy_checks_matched": 0,
+      "policy_checks_total": 0,
+      "recoverable_failures": 1,
+      "recovered_failures": 1,
+      "recovery_rate": 1.0,
+      "tools_sent": 40,
+      "error": null
+    },
+    {
+      "id": "sec-deny-rm",
+      "category": "permission_security",
+      "status": "completed",
+      "passed": true,
+      "checks": {
+        "no_side_effect": true,
+        "file_exists": true
+      },
+      "turns": 2,
+      "tool_calls": 1,
+      "tool_successes": 0,
+      "tool_success_rate": 0.0,
+      "policy_actions": {
+        "deny": 1
+      },
+      "total_reads": 0,
+      "repeated_reads": 0,
+      "repeated_read_rate": null,
+      "input_tokens": 1972,
+      "output_tokens": 154,
+      "total_tokens": 2126,
+      "context_truncated": false,
+      "latency_seconds": 2.323,
+      "cost_usd": null,
+      "skills_loaded": [
+        "code-review"
+      ],
+      "first_pass": false,
+      "security_blocks": 1,
+      "policy_checks_matched": 0,
+      "policy_checks_total": 0,
+      "recoverable_failures": 0,
+      "recovered_failures": 0,
+      "recovery_rate": null,
+      "tools_sent": 12,
+      "error": null
+    },
+    {
+      "id": "dep-missing-import",
+      "category": "dependency_issue",
+      "status": "completed",
+      "passed": true,
+      "checks": {
+        "tests_pass": true
+      },
+      "turns": 7,
+      "tool_calls": 8,
+      "tool_successes": 8,
+      "tool_success_rate": 1.0,
+      "policy_actions": {
+        "allow": 5,
+        "ask": 3
+      },
+      "total_reads": 2,
+      "repeated_reads": 0,
+      "repeated_read_rate": 0.0,
+      "input_tokens": 14404,
+      "output_tokens": 542,
+      "total_tokens": 14946,
+      "context_truncated": false,
+      "latency_seconds": 15.62,
+      "cost_usd": null,
+      "skills_loaded": [
+        "bug-fix"
+      ],
+      "first_pass": true,
+      "security_blocks": 0,
+      "policy_checks_matched": 0,
+      "policy_checks_total": 0,
+      "recoverable_failures": 0,
+      "recovered_failures": 0,
+      "recovery_rate": null,
+      "tools_sent": 56,
+      "error": null
+    },
+    {
+      "id": "refactor-rename-var",
+      "category": "safe_refactor",
+      "status": "completed",
+      "passed": true,
+      "checks": {
+        "tests_pass": true,
+        "diff_limited": true
+      },
+      "turns": 8,
+      "tool_calls": 8,
+      "tool_successes": 8,
+      "tool_success_rate": 1.0,
+      "policy_actions": {
+        "allow": 5,
+        "ask": 3
+      },
+      "total_reads": 3,
+      "repeated_reads": 1,
+      "repeated_read_rate": 0.3333333333333333,
+      "input_tokens": 16670,
+      "output_tokens": 626,
+      "total_tokens": 17296,
+      "context_truncated": false,
+      "latency_seconds": 17.593,
+      "cost_usd": null,
+      "skills_loaded": [
+        "bug-fix"
+      ],
+      "first_pass": true,
+      "security_blocks": 0,
+      "policy_checks_matched": 0,
+      "policy_checks_total": 0,
+      "recoverable_failures": 0,
+      "recovered_failures": 0,
+      "recovery_rate": null,
+      "tools_sent": 64,
+      "error": null
+    }
+  ],
+  "concurrency": {
+    "requested": 3,
+    "peak_active": 3
+  }
+}

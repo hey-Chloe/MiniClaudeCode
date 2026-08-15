@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shlex
 import sys
 import uuid
 from getpass import getpass
@@ -18,9 +19,12 @@ from miniclaude.llm import (
     OpenAIProviderConfig,
 )
 from miniclaude.metrics import CostCalculator, Pricing
+from miniclaude.mcp import MCPClient, MCPServerConfig
 from miniclaude.runtime_tools import create_runtime_tools
 from miniclaude.session import SessionStore
+from miniclaude.tools import ToolDefinition
 from runtime import DockerRuntime, LocalProcessRuntime
+from security.policy import ToolRisk
 from security.policy import PermissionModePolicy
 
 
@@ -48,9 +52,13 @@ def main() -> int:
             args.session_id,
             args.sessions_dir,
             verify=args.verify,
+            review=args.review,
             tool_gating=not args.no_tool_gating,
             resume=args.resume,
             provider=args.provider,
+            mcp_demo=args.mcp_demo,
+            mcp_servers=args.mcp,
+            multi_agent=args.multi_agent,
         )
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -90,9 +98,37 @@ def _parser() -> argparse.ArgumentParser:
         help="run pytest before finalizing when files were edited",
     )
     parser.add_argument(
+        "--review",
+        action="store_true",
+        help=(
+            "run a reviewer LLM pass over the diff before finalizing "
+            "(second-pass verification; implies the file-editing gate)"
+        ),
+    )
+    parser.add_argument(
         "--no-tool-gating",
         action="store_true",
         help="send every tool schema on every turn instead of activating a subset",
+    )
+    parser.add_argument(
+        "--mcp-demo",
+        action="store_true",
+        help="attach the bundled demo MCP server (stdio)",
+    )
+    parser.add_argument(
+        "--mcp",
+        action="append",
+        default=None,
+        metavar="NAME=COMMAND[ ARGS...]",
+        help="attach an external MCP stdio server; repeatable",
+    )
+    parser.add_argument(
+        "--multi-agent",
+        action="store_true",
+        help=(
+            "run the task through the coordinator/specialist multi-agent "
+            "pipeline (shared blackboard, concurrent specialists, optional critic)"
+        ),
     )
     return parser
 
@@ -111,22 +147,26 @@ def _run_v5(
     sessions_dir=None,
     *,
     verify: bool = False,
+    review: bool = False,
     tool_gating: bool = True,
     resume: bool = False,
     provider: str = "auto",
+    mcp_demo: bool = False,
+    mcp_servers: list[str] | None = None,
+    multi_agent: bool = False,
 ) -> int:
-    if provider == "anthropic":
-        llm_provider = AnthropicProvider(
-            AnthropicProviderConfig(
-                model=config.model or "",
-                api_key=os.getenv("ANTHROPIC_API_KEY") or config.api_key,
-                base_url=config.base_url,
-                timeout=config.timeout,
-                max_retries=config.max_retries,
+    def provider_factory():
+        if provider == "anthropic":
+            return AnthropicProvider(
+                AnthropicProviderConfig(
+                    model=config.model or "",
+                    api_key=os.getenv("ANTHROPIC_API_KEY") or config.api_key,
+                    base_url=config.base_url,
+                    timeout=config.timeout,
+                    max_retries=config.max_retries,
+                )
             )
-        )
-    else:
-        llm_provider = OpenAIProvider(
+        return OpenAIProvider(
             OpenAIProviderConfig(
                 model=config.model or "",
                 api_key=config.api_key,
@@ -135,6 +175,8 @@ def _run_v5(
                 max_retries=config.max_retries,
             )
         )
+
+    llm_provider = provider_factory()
     runtime_class = DockerRuntime if config.runtime == "docker" else LocalProcessRuntime
     runtime = runtime_class(
         config.workspace,
@@ -171,36 +213,81 @@ def _run_v5(
                     + (result.stderr or "")[-2000:]
                 ),
             }
-    agent = Agent(
-        provider=llm_provider,
-        tools=create_runtime_tools(runtime),
-        max_turns=config.max_turns,
-        security_policy=PermissionModePolicy(config.permission_mode),
-        approval_callback=_approval_callback if config.permission_mode == "default" else None,
-        context_config=ContextConfig(
-            workspace=config.workspace,
-            skills_dir=skills_dir if skills_dir.is_dir() else None,
-        ),
-        cost_calculator=cost_calculator,
-        verifier=verifier,
-        tool_gating=tool_gating,
-    )
-    store = None
-    if session_id or sessions_dir or resume:
-        store = SessionStore(sessions_dir or config.workspace / "sessions")
-    if resume:
-        if not session_id:
-            raise ValueError("--resume requires --session-id")
-        checkpoint = store.load_checkpoint(session_id)
-        result = agent.resume(task, checkpoint)
-    else:
-        result = agent.run_result(task)
-    if store is not None:
-        resolved_id = session_id or str(uuid.uuid4())
-        store.save(resolved_id, result, agent.trace.export_detailed())
-        if result.status.value != "completed":
-            checkpoint = agent.build_checkpoint(result)
-            store.save_checkpoint(resolved_id, checkpoint)
+    if review:
+        from miniclaude.reviewer import build_review_verifier
+
+        reviewer_provider = OpenAIProvider(
+            OpenAIProviderConfig(
+                model=config.model or "",
+                api_key=config.api_key,
+                base_url=config.base_url,
+                timeout=config.timeout,
+                max_retries=config.max_retries,
+            )
+        )
+        verifier = build_review_verifier(reviewer_provider, runtime)
+    mcp_clients: list[MCPClient] = []
+    try:
+        mcp_clients, mcp_tools = _attach_mcp(
+            mcp_demo=mcp_demo,
+            mcp_servers=mcp_servers,
+        )
+        if multi_agent:
+            from miniclaude.agents import (
+                CollaborationBlackboard,
+                CoordinatorAgent,
+            )
+
+            coordinator = CoordinatorAgent(
+                provider_factory=lambda name: provider_factory(),
+                workspace=config.workspace,
+                tools=create_runtime_tools(runtime) + mcp_tools,
+                blackboard=CollaborationBlackboard(),
+                concurrency=2,
+            )
+            multi_result = coordinator.run(task)
+            print(
+                json.dumps(
+                    multi_result.to_dict(),
+                    ensure_ascii=False,
+                    indent=2,
+                    default=str,
+                )
+            )
+            return 0 if multi_result.status == "completed" else 1
+        agent = Agent(
+            provider=llm_provider,
+            tools=create_runtime_tools(runtime) + mcp_tools,
+            max_turns=config.max_turns,
+            security_policy=PermissionModePolicy(config.permission_mode),
+            approval_callback=_approval_callback if config.permission_mode == "default" else None,
+            context_config=ContextConfig(
+                workspace=config.workspace,
+                skills_dir=skills_dir if skills_dir.is_dir() else None,
+            ),
+            cost_calculator=cost_calculator,
+            verifier=verifier,
+            tool_gating=tool_gating,
+        )
+        store = None
+        if session_id or sessions_dir or resume:
+            store = SessionStore(sessions_dir or config.workspace / "sessions")
+        if resume:
+            if not session_id:
+                raise ValueError("--resume requires --session-id")
+            checkpoint = store.load_checkpoint(session_id)
+            result = agent.resume(task, checkpoint)
+        else:
+            result = agent.run_result(task)
+        if store is not None:
+            resolved_id = session_id or str(uuid.uuid4())
+            store.save(resolved_id, result, agent.trace.export_detailed())
+            if result.status.value != "completed":
+                checkpoint = agent.build_checkpoint(result)
+                store.save_checkpoint(resolved_id, checkpoint)
+    finally:
+        for client in mcp_clients:
+            client.stop()
     if json_output:
         print(json.dumps({
             "status": result.status.value,
@@ -220,6 +307,56 @@ def _run_v5(
         if result.metrics is not None:
             _print_metrics_table(result.metrics)
     return 0 if result.status.value == "completed" else 1
+
+
+def _attach_mcp(
+    *,
+    mcp_demo: bool,
+    mcp_servers: list[str] | None,
+) -> tuple[list[MCPClient], list[ToolDefinition]]:
+    """Start configured MCP servers and collect their tools.
+
+    Returns ``(clients, tools)``; callers must stop the clients when done.
+    """
+    configs: list[MCPServerConfig] = []
+    if mcp_demo:
+        configs.append(
+            MCPServerConfig(
+                name="demo",
+                command=sys.executable,
+                args=("-m", "miniclaude.mcp.demo_server"),
+                risk=ToolRisk.MUTATING,
+                activation_keywords=("demo", "note", "echo"),
+            )
+        )
+    for spec in mcp_servers or []:
+        name, separator, command = spec.partition("=")
+        if not separator or not name.strip() or not command.strip():
+            raise ValueError(
+                f"--mcp expects NAME=COMMAND [ARGS...], got: {spec!r}"
+            )
+        parts = shlex.split(command, posix=False)
+        if not parts:
+            raise ValueError(f"--mcp command is empty for server {name!r}")
+        configs.append(
+            MCPServerConfig(
+                name=name.strip(),
+                command=parts[0],
+                args=tuple(parts[1:]),
+                risk=ToolRisk.MUTATING,
+            )
+        )
+    clients = [MCPClient(config) for config in configs]
+    tools: list[ToolDefinition] = []
+    try:
+        for client in clients:
+            client.start()
+            tools.extend(client.list_tools())
+    except Exception:
+        for client in clients:
+            client.stop()
+        raise
+    return clients, tools
 
 
 def _print_metrics_table(metrics) -> None:

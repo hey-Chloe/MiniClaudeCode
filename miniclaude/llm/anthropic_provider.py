@@ -145,6 +145,55 @@ class AnthropicProvider:
             raw=response,
         )
 
+    def complete_stream(self, request: LLMRequest):
+        """Yield incremental text deltas from the Messages API stream.
+
+        Streaming is text-only at the provider level (the agent loop uses the
+        synchronous ``complete`` contract); tool-use blocks are still handled
+        through ``complete``.
+        """
+        if request.turn == 0:
+            self._messages = []
+            self._pending_tool_uses = []
+        if request.tool_outputs:
+            self._append_tool_results(request.tool_outputs)
+
+        parameters: dict[str, Any] = {
+            "model": self.config.model,
+            "max_tokens": self.config.max_tokens,
+            "messages": list(self._messages),
+            "stream": True,
+        }
+        system = "\n\n".join(
+            value
+            for value in (self.config.instructions, request.instructions)
+            if value
+        )
+        if system:
+            parameters["system"] = system
+        if request.tools:
+            parameters["tools"] = [
+                self._anthropic_tool(tool) for tool in request.tools
+            ]
+
+        try:
+            stream = self._with_retry(
+                lambda: self.client.messages.create(**parameters)
+            )
+            for event in stream:
+                if self._block_value(event, "type") != "content_block_delta":
+                    continue
+                delta = self._block_value(event, "delta") or {}
+                if self._block_value(delta, "type") != "text_delta":
+                    continue
+                text = str(self._block_value(delta, "text") or "")
+                if text:
+                    yield text
+        except LLMProviderError:
+            raise
+        except Exception as exc:
+            raise LLMProviderError(f"Anthropic stream failed: {exc}") from exc
+
     def _append_tool_results(self, tool_outputs) -> None:
         if self._pending_tool_uses:
             self._messages.append(

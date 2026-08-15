@@ -5,6 +5,7 @@ from miniclaude.controller import AgentController, CompatibilityLoopDriver, Loop
 from miniclaude.context import ContextConfig, ContextManager
 from miniclaude.llm.base import LLMProvider
 from miniclaude.llm.driver import LLMLoopDriver
+from miniclaude.memory import PersistentMemory
 from miniclaude.metrics import CostCalculator
 from miniclaude.models import AgentResult, AgentState, RunStatus
 from miniclaude.session import SessionCheckpoint
@@ -27,6 +28,7 @@ class Agent:
         verifier: Callable[[], dict[str, Any]] | None = None,
         plan_first: bool = True,
         tool_gating: bool = True,
+        memory: PersistentMemory | None = None,
     ):
         if driver is not None and provider is not None:
             raise ValueError("provide either driver or provider, not both")
@@ -48,6 +50,7 @@ class Agent:
                 verifier=verifier,
                 plan_first=plan_first,
                 tool_gating=tool_gating,
+                memory=memory,
             )
             if provider is not None
             else CompatibilityLoopDriver()
@@ -57,6 +60,7 @@ class Agent:
             max_turns=max_turns,
         )
         self.cost_calculator = cost_calculator
+        self.memory = memory
 
     def run(self, task):
         """Run a task and return the v4.1-compatible event list."""
@@ -65,6 +69,18 @@ class Agent:
     def run_result(self, task) -> AgentResult:
         """Run a task and return its structured v5 result."""
         result = self.controller.run(task, trace=self.trace)
+        if self.memory is not None:
+            self.memory.put(
+                result.task,
+                (
+                    f"status={result.status.value}; turns={result.turns}; "
+                    f"output={str(result.output or '')[:200]}"
+                ),
+                metadata={
+                    "status": result.status.value,
+                    "turns": result.turns,
+                },
+            )
         if (
             self.cost_calculator is not None
             and result.metrics is not None

@@ -1,5 +1,77 @@
 # Changelog
 
+## 5.3.0 - 2026-08-15
+
+- The loop now records the full Plan -> Act -> Observe -> Reflect -> Verify
+  progression on tool rounds: the driver emits an explicit `tool_calls` trace
+  event and advances `AgentResult.phases` through `act -> observe` (adding
+  `reflect` when any tool call fails) inside a single decision
+  (`LoopDecision.extra_phases` / `extra_events`), so turn accounting and
+  checkpoint semantics are unchanged.
+- MCP is wired end to end: a bundled demo server
+  (`python -m miniclaude.mcp.demo_server`) exposes read-only and mutating
+  tools, the CLI attaches it with `--mcp-demo` (or any stdio server with
+  `--mcp NAME=COMMAND [ARGS...]`), server tools declare
+  `annotations.readOnlyHint` to map to `READ_ONLY` risk, and every MCP call
+  still passes through the ALLOW/ASK/DENY funnel. `MCPServerConfig` gained
+  `activation_keywords` for tool gating.
+- New offline benchmarks with versioned artifacts:
+  - `python -m evaluation.stress` replays a deterministic synthetic long
+    session through the real context-compression layers
+    (`reports/stress-compression-*.json`);
+  - `python -m evaluation.ab_tool_gating` measures tool-gating schema savings
+    on all 26 benchmark tasks (`reports/ab-tool-gating-*.json`);
+  - `python -m evaluation.ab_concurrency` micro-benchmarks sequential vs
+    pooled read-only dispatch (`reports/ab-concurrency-*.json`);
+  - `python -m evaluation.ab_read_cache` A/Bs the freshness read cache on a
+    repeated-read session (`reports/ab-read-cache-*.json`).
+- New console scripts: `miniclaude-stress`, `miniclaude-ab-gating`,
+  `miniclaude-ab-concurrency`, `miniclaude-ab-read-cache`.
+- `safety_block_rate` is now a real metric on `RunMetrics` and the coding
+  benchmark report (denied calls / tool calls).
+- The evolvable strategy space now includes `routing_mode`
+  (keyword/hybrid/semantic) and `read_cache_enabled`, both wired into the
+  live runner and the evolution candidate generator.
+- Failure attribution is real: `evaluation/attribution.py` derives structured
+  attribution from a run trace (failed tools, error kinds, phase, recovery,
+  policy denials) and `--attribution-trace` seeds evolution with
+  attribution-driven candidates (`attr-recovery-hint`, `attr-skill_top_k-2`,
+  `attr-retry_max_retries-3`).
+- Bounded memory is real: `WorkingMemory` (in-run, TTL, keyword retrieval,
+  eviction) and `PersistentMemory` (JSONL-backed cross-session store with TTL
+  and freshness checks). `Agent(memory=...)` injects relevant prior outcomes
+  at the start of a run and persists a run summary afterwards.
+- The Anthropic provider now implements `complete_stream`, so streaming is
+  supported on all three backends (OpenAI Responses, DeepSeek chat,
+  Anthropic Messages).
+- Bounded Multi-Agent is real: `miniclaude/reviewer.py` provides an
+  LLM-backed Reviewer second pass (`build_review_verifier`); the CLI wires it
+  with `--review`. A reviewer rejection is fed back into the main loop (like
+  a failed verification) and the agent gets a bounded chance to address the
+  comments before finalizing.
+- AsyncIO is real at the I/O and orchestration boundaries (the core loop
+  stays synchronous for determinism):
+  - `AsyncOpenAIProvider` (`miniclaude/llm/async_openai_provider.py`) drives
+    Responses / chat endpoints through `openai.AsyncOpenAI` with `acomplete`
+    and `acomplete_stream`;
+  - `RunInLoopProvider` bridges an async provider to the sync agent contract
+    with a per-instance event loop;
+  - `python -m evaluation.coding.async_runner` runs the live benchmark with
+    bounded asyncio concurrency (`--concurrency`, Semaphore + `to_thread`),
+    producing a `live_async` report.
+- The built-in toolset grew to 13 with three read-only, workspace-confined
+  tools: `file_tree` (depth-limited recursive listing), `todo_scan`
+  (TODO/FIXME/HACK markers), and `file_stat` (metadata and line counts).
+- Real Multi-Agent collaboration (`miniclaude/agents/`):
+  - `CollaborationBlackboard`: thread-safe shared evidence store with
+    provenance, content dedup, query, and verification marks;
+  - `SpecialistAgent`: one agent scoped to a subtask with its own prompt and
+    tool subset, publishing answers and tool observations to the blackboard;
+  - `CoordinatorAgent`: deterministic task decomposition, concurrent
+    specialist execution, workspace cross-check of evidence, synthesized
+    final answer, and an optional `Critic` second pass;
+  - CLI `--multi-agent` runs the pipeline end to end.
+
 ## 5.2.0 - 2026-08-14
 
 - The bounded loop now records an explicit phase per decision

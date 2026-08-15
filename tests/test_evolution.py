@@ -54,6 +54,21 @@ class StrategyEvolutionTests(unittest.TestCase):
             "v1", [candidate.version for candidate in first[1:]]
         )
 
+    def test_mutations_cover_routing_and_cache_dimensions(self):
+        base = StrategyConfig(version="v1")
+        versions = {
+            candidate.version
+            for candidate in generate_candidates(base, max_candidates=20)
+        }
+
+        self.assertIn("cand-routing_mode-keyword", versions)
+        self.assertIn("cand-routing_mode-semantic", versions)
+        self.assertIn("cand-read_cache_enabled-False", versions)
+
+    def test_invalid_routing_mode_is_rejected(self):
+        with self.assertRaises(ValueError):
+            StrategyConfig(version="bad", routing_mode="vector")
+
     def test_evolve_promotes_candidate_that_improves_holdout(self):
         base = StrategyConfig(version="v1")
         candidate_version = "cand-skill_top_k-2"

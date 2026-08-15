@@ -92,7 +92,11 @@ class AgentController:
 
             self._validate_decision(decision)
             state.turn_count += 1
+            for extra_phase in decision.extra_phases:
+                state.phases.append(extra_phase.value)
             state.phases.append(decision.phase.value)
+            for extra_event, extra_detail in decision.extra_events:
+                current_trace.add(extra_event, extra_detail)
             current_trace.add(decision.event, decision.detail)
             if decision.event == "tool_results":
                 self._record_file_modifications(current_trace, decision.detail)

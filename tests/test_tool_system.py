@@ -228,8 +228,9 @@ class ToolLoopIntegrationTests(unittest.TestCase):
 
         self.assertEqual(result.status, RunStatus.COMPLETED)
         self.assertEqual(result.turns, 2)
-        self.assertEqual(result.events[1]["event"], "tool_results")
-        self.assertTrue(result.events[1]["detail"][0]["success"])
+        self.assertEqual(result.events[1]["event"], "tool_calls")
+        self.assertEqual(result.events[2]["event"], "tool_results")
+        self.assertTrue(result.events[2]["detail"][0]["success"])
         second_request = provider.requests[1]
         self.assertEqual(second_request.previous_response_id, "resp_1")
         model_result = json.loads(second_request.tool_outputs[0]["output"])

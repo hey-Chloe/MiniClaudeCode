@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "run_type": "stress_compression",
+  "session": {
+    "turns": 12,
+    "seed": 5,
+    "messages": 26,
+    "patterns": {
+      "repeated_reads": true,
+      "superseded_snapshots": true,
+      "oversized_outputs": true
+    }
+  },
+  "configs": {
+    "baseline": {
+      "label": "none",
+      "messages_in": 26,
+      "messages_out": 27,
+      "chars_in": 17779,
+      "chars_out": 17807,
+      "chars_removed": -28,
+      "chars_removed_pct": -0.16,
+      "messages_removed_pct": -3.85,
+      "compression": {
+        "stale_sniped": 0,
+        "micro_compacted": 0,
+        "auto_compacted": 0,
+        "chars_removed": 0
+      },
+      "truncated": false
+    },
+    "compressed": {
+      "label": "stale_snip+micro_compact",
+      "messages_in": 26,
+      "messages_out": 27,
+      "chars_in": 17779,
+      "chars_out": 8467,
+      "chars_removed": 9312,
+      "chars_removed_pct": 52.38,
+      "messages_removed_pct": -3.85,
+      "compression": {
+        "stale_sniped": 0,
+        "micro_compacted": 2,
+        "auto_compacted": 0,
+        "chars_removed": 9340
+      },
+      "truncated": false
+    },
+    "budget_only": {
+      "label": "none",
+      "messages_in": 26,
+      "messages_out": 27,
+      "chars_in": 17779,
+      "chars_out": 17807,
+      "chars_removed": -28,
+      "chars_removed_pct": -0.16,
+      "messages_removed_pct": -3.85,
+      "compression": {
+        "stale_sniped": 0,
+        "micro_compacted": 0,
+        "auto_compacted": 0,
+        "chars_removed": 0
+      },
+      "truncated": false
+    }
+  },
+  "compression_gain": {
+    "chars_removed": 9340,
+    "chars_removed_pct": 52.45,
+    "messages_removed": 0,
+    "messages_removed_pct": 0.0
+  }
+}

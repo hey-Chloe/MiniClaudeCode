@@ -4,6 +4,7 @@ import fnmatch
 import re
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from git.diff import generate_diff
 from miniclaude.memory import FileCache
@@ -12,7 +13,11 @@ from runtime.base import Runtime
 from security.policy import ToolRisk
 
 
-def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
+def create_runtime_tools(
+    runtime: Runtime,
+    *,
+    cache_enabled: bool = True,
+) -> list[ToolDefinition]:
     """Create host-capable tools for an explicitly supplied runtime."""
 
     def execute_command(argv: Sequence[str], cwd: str = ".", timeout: int = 120):
@@ -21,7 +26,7 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
     workspace = runtime.info.workspace
     initial_files = _snapshot_workspace(workspace)
     git_workspace = "/workspace" if runtime.info.name == "docker" else str(workspace)
-    cache = FileCache()
+    cache = FileCache() if cache_enabled else None
 
     def git_command(*arguments: str):
         return ["git", "-c", f"safe.directory={git_workspace}", *arguments]
@@ -69,6 +74,89 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
                         return matches
         return matches
 
+    def file_tree(path: str = ".", depth: int = 3, limit: int = 500):
+        """Return a depth-limited, sorted recursive listing of the workspace."""
+        if depth < 1 or limit < 1:
+            raise ValueError("depth and limit must be positive")
+        root = _resolve(runtime, path)
+        if not root.is_dir():
+            raise ValueError(f"directory does not exist: {path}")
+        entries: list[dict[str, Any]] = []
+        stack = [(root, 0)]
+        while stack:
+            directory, level = stack.pop()
+            if level >= depth:
+                continue
+            children = sorted(
+                directory.iterdir(), key=lambda item: item.name.lower()
+            )
+            for child in children:
+                if len(entries) >= limit:
+                    break
+                relative = child.relative_to(workspace).as_posix()
+                entries.append(
+                    {
+                        "path": relative,
+                        "type": "directory" if child.is_dir() else "file",
+                        "depth": level + 1,
+                    }
+                )
+                if child.is_dir():
+                    stack.append((child, level + 1))
+        return entries
+
+    def todo_scan(
+        pattern: str = r"TODO|FIXME|HACK",
+        path: str = ".",
+        limit: int = 100,
+    ):
+        """Scan workspace text files for TODO/FIXME-style markers."""
+        expression = re.compile(pattern)
+        root = _resolve(runtime, path)
+        matches: list[dict[str, Any]] = []
+        candidates = [root] if root.is_file() else root.rglob("*")
+        for candidate in candidates:
+            if not candidate.is_file() or candidate.stat().st_size > 2_000_000:
+                continue
+            try:
+                lines = candidate.read_text(encoding="utf-8").splitlines()
+            except (UnicodeDecodeError, OSError):
+                continue
+            for number, line in enumerate(lines, 1):
+                if expression.search(line):
+                    matches.append(
+                        {
+                            "path": candidate.relative_to(workspace).as_posix(),
+                            "line": number,
+                            "text": line.strip()[:300],
+                        }
+                    )
+                    if len(matches) >= limit:
+                        return matches
+        return matches
+
+    def file_stat(path: str):
+        """Return metadata for one workspace file or directory."""
+        target = _resolve(runtime, path)
+        if not target.exists():
+            raise ValueError(f"path does not exist: {path}")
+        stat_result = target.stat()
+        line_count = None
+        if target.is_file():
+            try:
+                line_count = len(
+                    target.read_text(encoding="utf-8", errors="replace").splitlines()
+                )
+            except OSError:
+                line_count = None
+        return {
+            "path": target.relative_to(workspace).as_posix(),
+            "type": "directory" if target.is_dir() else "file",
+            "size_bytes": stat_result.st_size,
+            "mtime": stat_result.st_mtime,
+            "line_count": line_count,
+        }
+
     def replace_text(path: str, old: str, new: str):
         if not old:
             raise ValueError("old text must not be empty")
@@ -83,19 +171,23 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
     def read_file(path: str):
         """Read with a freshness-checked cache; reports ``cache_hit``."""
         target = _resolve(runtime, path)
-        try:
-            stat_result = target.stat()
-            cached = cache.get(path, stat_result.st_mtime, stat_result.st_size)
-            if cached is not None:
-                return {
-                    "path": path,
-                    "content": cached,
-                    "cache_hit": True,
-                }
-        except OSError:
-            stat_result = None
+        stat_result = None
+        if cache is not None:
+            try:
+                stat_result = target.stat()
+                cached = cache.get(
+                    path, stat_result.st_mtime, stat_result.st_size
+                )
+                if cached is not None:
+                    return {
+                        "path": path,
+                        "content": cached,
+                        "cache_hit": True,
+                    }
+            except OSError:
+                stat_result = None
         content = runtime.read_text(path)
-        if stat_result is not None:
+        if cache is not None and stat_result is not None:
             cache.put(path, stat_result.st_mtime, stat_result.st_size, content)
         return {
             "path": path,
@@ -105,7 +197,8 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
 
     def write_file(path: str, content: str):
         result = runtime.write_text(path, content)
-        cache.invalidate(path)
+        if cache is not None:
+            cache.invalidate(path)
         return result
 
     def git_status():
@@ -279,6 +372,61 @@ def create_runtime_tools(runtime: Runtime) -> list[ToolDefinition]:
             parameters=_object_schema({}),
             handler=workspace_diff,
             activation_keywords=("diff", "change", "workspace", "modified"),
+        ),
+        ToolDefinition(
+            name="file_tree",
+            description=(
+                "Return a depth-limited, sorted recursive listing of a "
+                "workspace directory (paths, types, depth)."
+            ),
+            parameters=_object_schema(
+                {
+                    "path": {"type": "string"},
+                    "depth": {"type": "integer"},
+                    "limit": {"type": "integer"},
+                }
+            ),
+            handler=file_tree,
+            activation_keywords=(
+                "tree",
+                "structure",
+                "hierarchy",
+                "layout",
+                "explore",
+            ),
+        ),
+        ToolDefinition(
+            name="todo_scan",
+            description=(
+                "Scan workspace text files for TODO/FIXME/HACK markers and "
+                "return file, line, and text for each hit."
+            ),
+            parameters=_object_schema(
+                {
+                    "pattern": {"type": "string"},
+                    "path": {"type": "string"},
+                    "limit": {"type": "integer"},
+                },
+                ["pattern"],
+            ),
+            handler=todo_scan,
+            activation_keywords=("todo", "fixme", "hack", "marker", "pending"),
+        ),
+        ToolDefinition(
+            name="file_stat",
+            description=(
+                "Return metadata for one workspace file or directory "
+                "(type, size, mtime, line count)."
+            ),
+            parameters=_object_schema({"path": {"type": "string"}}, ["path"]),
+            handler=file_stat,
+            activation_keywords=(
+                "stat",
+                "size",
+                "mtime",
+                "metadata",
+                "lines",
+            ),
         ),
     ]
 

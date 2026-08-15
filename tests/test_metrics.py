@@ -75,6 +75,7 @@ class RunMetricsTests(unittest.TestCase):
         self.assertEqual(metrics.tool_successes, 2)
         self.assertEqual(metrics.tool_success_rate, 2 / 3)
         self.assertEqual(metrics.policy_actions, {"allow": 2, "deny": 1})
+        self.assertEqual(metrics.safety_block_rate, 1 / 3)
         self.assertEqual(metrics.total_reads, 2)
         self.assertEqual(metrics.repeated_reads, 1)
         self.assertEqual(metrics.repeated_read_rate, 0.5)

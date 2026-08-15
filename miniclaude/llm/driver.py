@@ -6,6 +6,7 @@ from typing import Any
 
 from miniclaude.context import ContextManager
 from miniclaude.llm.base import LLMProvider, LLMRequest
+from miniclaude.memory import PersistentMemory, WorkingMemory
 from miniclaude.models import AgentPhase, AgentState, LoopDecision
 from miniclaude.tools import ToolRegistry
 from security.policy import ToolRisk
@@ -25,6 +26,7 @@ class LLMLoopDriver:
         verifier: Callable[[], dict[str, Any]] | None = None,
         plan_first: bool = True,
         tool_gating: bool = True,
+        memory: PersistentMemory | None = None,
     ):
         self.provider = provider
         self.tools = tools if tools is not None else ToolRegistry()
@@ -32,6 +34,8 @@ class LLMLoopDriver:
         self.verifier = verifier
         self.plan_first = plan_first
         self.tool_gating = tool_gating
+        self.memory = memory
+        self.working_memory = WorkingMemory()
         self._dirty = False
         self._final_text: str | None = None
 
@@ -50,6 +54,9 @@ class LLMLoopDriver:
         if state.turn_count == 0:
             snapshot = self.context.start(state.task)
             state.skills_loaded = snapshot.skills
+            if self.memory is not None:
+                self._inject_memory(state.task)
+                snapshot = self.context.snapshot()
         else:
             snapshot = self.context.snapshot()
         if snapshot.compression:
@@ -121,16 +128,45 @@ class LLMLoopDriver:
             )
             for observation in observations:
                 self.context.add_tool(observation.model_output())
+            for observation in observations:
+                self.working_memory.put(
+                    observation.name,
+                    (
+                        f"{observation.name}: ok"
+                        if observation.success
+                        else (
+                            f"{observation.name}: failed: "
+                            f"{observation.error or 'unknown error'}"
+                        )
+                    ),
+                    metadata={"success": observation.success},
+                )
+            failed = any(
+                not observation.success for observation in observations
+            )
             return LoopDecision(
                 event="tool_results",
                 detail=[observation.to_dict() for observation in observations],
                 phase=(
-                    AgentPhase.REFLECT
-                    if any(
-                        not observation.success
-                        for observation in observations
-                    )
-                    else AgentPhase.ACT
+                    AgentPhase.REFLECT if failed else AgentPhase.OBSERVE
+                ),
+                extra_phases=(
+                    (AgentPhase.ACT, AgentPhase.OBSERVE)
+                    if failed
+                    else (AgentPhase.ACT,)
+                ),
+                extra_events=(
+                    (
+                        "tool_calls",
+                        [
+                            {
+                                "call_id": call.call_id,
+                                "name": call.name,
+                                "arguments": call.arguments,
+                            }
+                            for call in response.tool_calls
+                        ],
+                    ),
                 ),
             )
 
@@ -166,6 +202,21 @@ class LLMLoopDriver:
             detail=response.text,
             terminal=True,
             phase=AgentPhase.FINALIZE,
+        )
+
+    def _inject_memory(self, task: str) -> None:
+        """Inject relevant cross-session memories as an assistant message."""
+        if self.memory is None:
+            return
+        retrieved = self.memory.retrieve(task, top_k=3, max_chars=1200)
+        if not retrieved:
+            return
+        sections = [
+            f"- {entry.key}: {entry.content[:200]}"
+            for entry in retrieved
+        ]
+        self.context.add_assistant(
+            "Run memory from previous sessions:\n" + "\n".join(sections)
         )
 
     def _dispatch_batch(self, calls):

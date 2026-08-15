@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "run_type": "ab_concurrency",
+  "note": "Observed wall-clock medians on this machine (LocalProcessRuntime, read-only batch); not a portable performance guarantee.",
+  "batch": {
+    "calls": 16,
+    "workers": 4,
+    "modes": {
+      "sequential": 1,
+      "pooled": 4
+    }
+  },
+  "results": {
+    "sequential": {
+      "samples_seconds": [
+        0.117706,
+        0.110975,
+        0.079601,
+        0.059925,
+        0.04824,
+        0.053446,
+        0.073576
+      ],
+      "median_seconds": 0.073576
+    },
+    "pooled": {
+      "samples_seconds": [
+        0.076669,
+        0.081402,
+        0.048714,
+        0.043893,
+        0.051017,
+        0.045682,
+        0.050297
+      ],
+      "median_seconds": 0.050297
+    },
+    "speedup": 1.463,
+    "pooled_pct_change": -31.64
+  }
+}

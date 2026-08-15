@@ -40,6 +40,12 @@ class LoopDecision:
     detail: Any
     terminal: bool = False
     phase: AgentPhase = AgentPhase.ACT
+    # Extra phases/events recorded alongside the main decision without
+    # consuming an extra turn. A tool round is one decision that advances
+    # through act -> observe (plus reflect on failure), so all three stages
+    # are auditable in ``AgentResult.phases`` and the trace.
+    extra_phases: tuple[AgentPhase, ...] = ()
+    extra_events: tuple[tuple[str, Any], ...] = ()
 
 
 @dataclass(slots=True)

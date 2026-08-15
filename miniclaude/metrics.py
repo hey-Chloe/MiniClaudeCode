@@ -98,6 +98,14 @@ class RunMetrics:
         return self.recovered_failures / self.recoverable_failures
 
     @property
+    def safety_block_rate(self) -> float | None:
+        """Share of tool calls blocked by the security policy (DENY)."""
+        if self.tool_calls == 0:
+            return None
+        denied = self.policy_actions.get("deny", 0)
+        return denied / self.tool_calls
+
+    @property
     def average_tools_per_turn(self) -> float | None:
         if self.turns == 0:
             return None
@@ -122,6 +130,7 @@ class RunMetrics:
             "recoverable_failures": self.recoverable_failures,
             "recovered_failures": self.recovered_failures,
             "recovery_rate": self.recovery_rate,
+            "safety_block_rate": self.safety_block_rate,
             "tools_sent": self.tools_sent,
             "average_tools_per_turn": self.average_tools_per_turn,
             "cache_hits": self.cache_hits,

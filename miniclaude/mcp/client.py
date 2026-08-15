@@ -29,6 +29,16 @@ class MCPServerConfig:
     args: tuple[str, ...] = ()
     env: tuple[tuple[str, str], ...] = ()
     risk: ToolRisk = ToolRisk.MUTATING
+    activation_keywords: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.name.strip() or not self.command.strip():
+            raise ValueError("MCP server name and command must not be empty")
+        if not all(
+            isinstance(keyword, str) and keyword.strip()
+            for keyword in self.activation_keywords
+        ):
+            raise ValueError("activation keywords must be non-empty strings")
 
 
 class MCPClient:
@@ -65,7 +75,7 @@ class MCPClient:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "miniclaude", "version": "5.2.0"},
+                "clientInfo": {"name": "miniclaude", "version": "5.3.0"},
             },
         )
         return self
@@ -79,6 +89,12 @@ class MCPClient:
             name = item.get("name")
             if not name:
                 continue
+            annotations = item.get("annotations") or {}
+            risk = (
+                ToolRisk.READ_ONLY
+                if annotations.get("readOnlyHint") is True
+                else self.config.risk
+            )
             tool = ToolDefinition(
                 name=str(name),
                 description=str(item.get("description") or ""),
@@ -91,7 +107,8 @@ class MCPClient:
                     }
                 ),
                 handler=self._handler(str(name)),
-                risk=self.config.risk,
+                risk=risk,
+                activation_keywords=self.config.activation_keywords,
             )
             self._tools[str(name)] = tool
             tools.append(tool)

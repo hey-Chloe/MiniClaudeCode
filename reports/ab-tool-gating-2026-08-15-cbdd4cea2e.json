@@ -1,0 +1,615 @@
+{
+  "version": "1.0",
+  "run_type": "ab_tool_gating",
+  "note": "Offline replay of the real activation path over the 26-task benchmark; no model calls.",
+  "totals": {
+    "tasks": 26,
+    "tools_total": 10,
+    "schema_chars_full": 77298,
+    "schema_chars_gated": 60592,
+    "saved_chars": 16706,
+    "saved_pct": 21.61,
+    "gated_tasks": 26,
+    "fallback_tasks": 0
+  },
+  "per_category": {
+    "code_search": {
+      "tasks": 3,
+      "schema_chars_full": 8919,
+      "schema_chars_gated": 3678,
+      "saved_pct": 58.76
+    },
+    "config_repair": {
+      "tasks": 3,
+      "schema_chars_full": 8919,
+      "schema_chars_gated": 7626,
+      "saved_pct": 14.5
+    },
+    "dependency_issue": {
+      "tasks": 3,
+      "schema_chars_full": 8919,
+      "schema_chars_gated": 7626,
+      "saved_pct": 14.5
+    },
+    "failing_test_fix": {
+      "tasks": 7,
+      "schema_chars_full": 20811,
+      "schema_chars_gated": 17794,
+      "saved_pct": 14.5
+    },
+    "permission_security": {
+      "tasks": 3,
+      "schema_chars_full": 8919,
+      "schema_chars_gated": 5854,
+      "saved_pct": 34.36
+    },
+    "safe_refactor": {
+      "tasks": 3,
+      "schema_chars_full": 8919,
+      "schema_chars_gated": 7846,
+      "saved_pct": 12.03
+    },
+    "small_feature": {
+      "tasks": 4,
+      "schema_chars_full": 11892,
+      "schema_chars_gated": 10168,
+      "saved_pct": 14.5
+    }
+  },
+  "cases": [
+    {
+      "id": "fix-add-negatives",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "fix-max-empty",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "fix-parse-price",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "fix-off-by-one",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "fix-reverse-in-place",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "fix-case-insensitive-search",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "fix-parse-line",
+      "category": "failing_test_fix",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "feat-chunk",
+      "category": "small_feature",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "feat-unique",
+      "category": "small_feature",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "feat-clamp",
+      "category": "small_feature",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "feat-slugify",
+      "category": "small_feature",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "search-locate-sanitize",
+      "category": "code_search",
+      "tools_total": 10,
+      "tools_sent_gated": 4,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 1226,
+      "saved_chars": 1747,
+      "saved_pct": 58.76,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files"
+      ]
+    },
+    {
+      "id": "search-todo",
+      "category": "code_search",
+      "tools_total": 10,
+      "tools_sent_gated": 4,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 1226,
+      "saved_chars": 1747,
+      "saved_pct": 58.76,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files"
+      ]
+    },
+    {
+      "id": "search-config-timeout",
+      "category": "code_search",
+      "tools_total": 10,
+      "tools_sent_gated": 4,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 1226,
+      "saved_chars": 1747,
+      "saved_pct": 58.76,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files"
+      ]
+    },
+    {
+      "id": "refactor-rename-var",
+      "category": "safe_refactor",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "refactor-extract-helper",
+      "category": "safe_refactor",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "refactor-status-constants",
+      "category": "safe_refactor",
+      "tools_total": 10,
+      "tools_sent_gated": 9,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2762,
+      "saved_chars": 211,
+      "saved_pct": 7.1,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "config-fix-json",
+      "category": "config_repair",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "config-fix-toml",
+      "category": "config_repair",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "config-fix-key",
+      "category": "config_repair",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "dep-missing-import",
+      "category": "dependency_issue",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "dep-wrong-module",
+      "category": "dependency_issue",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "dep-unavailable-dependency",
+      "category": "dependency_issue",
+      "tools_total": 10,
+      "tools_sent_gated": 8,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2542,
+      "saved_chars": 431,
+      "saved_pct": 14.5,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "list_directory",
+        "glob_files",
+        "read_file",
+        "grep_files",
+        "execute_command",
+        "replace_text",
+        "write_file",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "sec-deny-rm",
+      "category": "permission_security",
+      "tools_total": 10,
+      "tools_sent_gated": 6,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 1752,
+      "saved_chars": 1221,
+      "saved_pct": 41.07,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "git_diff",
+        "git_status",
+        "grep_files",
+        "read_file",
+        "execute_command",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "sec-path-escape",
+      "category": "permission_security",
+      "tools_total": 10,
+      "tools_sent_gated": 7,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2004,
+      "saved_chars": 969,
+      "saved_pct": 32.59,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "git_diff",
+        "git_status",
+        "grep_files",
+        "read_file",
+        "execute_command",
+        "workspace_diff"
+      ]
+    },
+    {
+      "id": "sec-approval-ask",
+      "category": "permission_security",
+      "tools_total": 10,
+      "tools_sent_gated": 7,
+      "schema_chars_full": 2973,
+      "schema_chars_gated": 2098,
+      "saved_chars": 875,
+      "saved_pct": 29.43,
+      "gated": true,
+      "fallback_full": false,
+      "skill_tools": [
+        "git_diff",
+        "git_status",
+        "grep_files",
+        "read_file",
+        "execute_command",
+        "workspace_diff"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "run_type": "evolution",
+  "final_version": "cand-skill_top_k-2",
+  "generations": [
+    {
+      "generation": 0,
+      "base_version": "v1",
+      "decision": "promoted",
+      "promoted_version": "cand-skill_top_k-2",
+      "base_holdout": {
+        "success_rate": 0.5,
+        "average_tokens": 13642.0,
+        "average_latency_seconds": 18.923401450000256,
+        "recovery_rate": 0.0,
+        "average_tools_sent_per_turn": 3.5
+      },
+      "candidates": [
+        {
+          "version": "v1",
+          "train": {
+            "success_rate": 0.5,
+            "average_tokens": 8368.0,
+            "average_latency_seconds": 11.089218749999873,
+            "recovery_rate": 1.0,
+            "average_tools_sent_per_turn": 4.416666666666667
+          },
+          "holdout": {
+            "success_rate": 0.5,
+            "average_tokens": 9368.0,
+            "average_latency_seconds": 10.64727935000019,
+            "recovery_rate": 0.0,
+            "average_tools_sent_per_turn": 3.9285714285714284
+          },
+          "selected": false
+        },
+        {
+          "version": "cand-skill_top_k-2",
+          "train": {
+            "success_rate": 0.5,
+            "average_tokens": 7225.5,
+            "average_latency_seconds": 9.53346640000018,
+            "recovery_rate": 1.0,
+            "average_tools_sent_per_turn": 4.363636363636363
+          },
+          "holdout": {
+            "success_rate": 0.5,
+            "average_tokens": 6941.0,
+            "average_latency_seconds": 7.434855599999992,
+            "recovery_rate": 0.0,
+            "average_tools_sent_per_turn": 4.7
+          },
+          "selected": true
+        }
+      ]
+    }
+  ]
+}

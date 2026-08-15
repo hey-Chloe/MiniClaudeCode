@@ -40,11 +40,13 @@ class StrategyConfig:
 
     version: str
     skill_top_k: int = 1
+    routing_mode: str = "hybrid"
     context_max_chars: int = 32_000
     micro_compact_max_chars: int = 4_000
     retry_max_retries: int = 2
     retry_base_delay: float = 0.5
     tool_gating: bool = True
+    read_cache_enabled: bool = True
     plan_first: bool = True
     system_instructions: str = DEFAULT_SYSTEM_INSTRUCTIONS
 
@@ -53,6 +55,10 @@ class StrategyConfig:
             raise ValueError("strategy version must not be empty")
         if self.skill_top_k < 1:
             raise ValueError("skill_top_k must be at least 1")
+        if self.routing_mode not in {"keyword", "hybrid", "semantic"}:
+            raise ValueError(
+                "routing_mode must be one of keyword/hybrid/semantic"
+            )
         if self.context_max_chars < 1:
             raise ValueError("context_max_chars must be positive")
         if self.micro_compact_max_chars < 1:
@@ -67,11 +73,13 @@ class StrategyConfig:
 
 _MUTATIONS: Mapping[str, tuple[Any, ...]] = {
     "skill_top_k": (2,),
+    "routing_mode": ("keyword", "semantic"),
     "context_max_chars": (24_000, 40_000),
     "micro_compact_max_chars": (2_000, 8_000),
     "retry_max_retries": (1, 3),
     "retry_base_delay": (0.2, 1.0),
     "tool_gating": (False,),
+    "read_cache_enabled": (False,),
     "plan_first": (False,),
 }
 
@@ -209,9 +217,16 @@ def _evolve_generation(
     holdout_ids: tuple[str, ...],
     generation: int,
     max_candidates: int,
+    extra_candidates: tuple[StrategyConfig, ...] = (),
 ) -> GenerationResult:
     base_holdout = dict(evaluate_fn(base, holdout_ids))
     candidates = generate_candidates(base, max_candidates=max_candidates)
+    known = {candidate.version for candidate in candidates}
+    candidates = candidates + tuple(
+        candidate
+        for candidate in extra_candidates
+        if candidate.version not in known
+    )
     results: list[CandidateResult] = []
     for candidate in candidates:
         results.append(
@@ -258,6 +273,7 @@ def evolve(
     *,
     generations: int = 1,
     max_candidates: int = 10,
+    extra_candidates: tuple[StrategyConfig, ...] = (),
 ) -> EvolutionRun:
     """Run the evolution loop; each generation may promote a new base."""
     if generations < 1:
@@ -272,6 +288,7 @@ def evolve(
             holdout_ids,
             generation=generation,
             max_candidates=max_candidates,
+            extra_candidates=extra_candidates,
         )
         results.append(result)
         if result.decision == "promoted" and result.promoted_strategy:
@@ -382,6 +399,14 @@ def main() -> int:
     parser.add_argument("--max-candidates", type=int, default=10)
     parser.add_argument("--base-version", default="v1")
     parser.add_argument("--tasks", default=None)
+    parser.add_argument(
+        "--attribution-trace",
+        default=None,
+        help=(
+            "path to a previous run's events JSON (AgentResult.events); "
+            "failures are attributed and seed extra strategy candidates"
+        ),
+    )
     args = parser.parse_args()
 
     base = StrategyConfig(version=args.base_version)
@@ -431,6 +456,30 @@ def main() -> int:
             permission_mode="default",
         )
 
+    extra_candidates: tuple[StrategyConfig, ...] = ()
+    attribution = None
+    if args.attribution_trace:
+        from evaluation.attribution import (
+            attribute_run,
+            generate_attribution_candidates,
+        )
+
+        payload = json.loads(
+            Path(args.attribution_trace).read_text(encoding="utf-8")
+        )
+        events = payload if isinstance(payload, list) else payload.get(
+            "events", []
+        )
+        phases = payload.get("phases", ()) if isinstance(payload, dict) else ()
+        attribution = attribute_run(events, phases)
+        extra_candidates = generate_attribution_candidates(
+            base, attribution
+        )
+        print(
+            f"attribution: {json.dumps(attribution.to_dict(), ensure_ascii=False)}",
+            file=sys.stderr,
+        )
+
     run = evolve(
         base,
         evaluate,
@@ -438,8 +487,14 @@ def main() -> int:
         holdout_ids,
         generations=args.generations,
         max_candidates=args.max_candidates,
+        extra_candidates=extra_candidates,
     )
     payload = run.to_dict()
+    if attribution is not None:
+        payload["attribution"] = attribution.to_dict()
+        payload["attribution_candidates"] = [
+            candidate.version for candidate in extra_candidates
+        ]
     rendered = json.dumps(payload, ensure_ascii=False, indent=2)
     print(rendered)
     save_report(f"evolution-{args.base_version}", payload)

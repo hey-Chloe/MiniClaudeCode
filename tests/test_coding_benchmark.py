@@ -241,8 +241,27 @@ class ReportAggregationTests(unittest.TestCase):
         self.assertEqual(report.total_cost_usd, 0.03)
         self.assertEqual(report.approval_accuracy, 1.0)
         self.assertEqual(report.security_blocks, 0)
+        self.assertEqual(report.safety_block_rate, 0.0)
         self.assertIsNone(report.recovery_rate)
         self.assertEqual(report.average_tools_sent_per_turn, 0.0)
+
+    def test_aggregate_safety_block_rate(self):
+        cases = (
+            self._case(
+                tool_calls=4,
+                policy_actions={"allow": 2, "deny": 2},
+                security_blocks=2,
+            ),
+            self._case(
+                tool_calls=2,
+                policy_actions={"deny": 1},
+                security_blocks=1,
+            ),
+        )
+        report = CodingReport.aggregate(cases, run_type="live", model="m1")
+
+        self.assertEqual(report.security_blocks, 3)
+        self.assertEqual(report.safety_block_rate, 3 / 6)
 
     def test_aggregate_recovery_rate(self):
         cases = (

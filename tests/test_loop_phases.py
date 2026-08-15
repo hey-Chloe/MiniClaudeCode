@@ -79,12 +79,16 @@ class LoopPhaseTests(unittest.TestCase):
             result = self._result(provider, [write_tool(Path(directory))], verifier)
 
         self.assertEqual(result.status, RunStatus.COMPLETED)
-        self.assertEqual(result.phases, ("plan", "act", "verify", "finalize"))
+        self.assertEqual(
+            result.phases,
+            ("plan", "act", "observe", "verify", "finalize"),
+        )
         self.assertEqual(
             [event["event"] for event in result.events],
             [
                 "task",
                 "plan",
+                "tool_calls",
                 "tool_results",
                 "file_modified",
                 "verification",
@@ -127,7 +131,7 @@ class LoopPhaseTests(unittest.TestCase):
         self.assertEqual(result.status, RunStatus.COMPLETED)
         self.assertEqual(
             result.phases,
-            ("plan", "act", "verify", "verify", "finalize"),
+            ("plan", "act", "observe", "verify", "verify", "finalize"),
         )
         self.assertEqual(len(verifier_runs), 2)
         self.assertEqual(provider.calls, 4)
@@ -190,7 +194,10 @@ class LoopPhaseTests(unittest.TestCase):
             self.assertTrue((Path(directory) / "note.txt").is_file())
 
         self.assertEqual(result.status, RunStatus.COMPLETED)
-        self.assertEqual(result.phases, ("plan", "reflect", "finalize"))
+        self.assertEqual(
+            result.phases,
+            ("plan", "act", "observe", "reflect", "finalize"),
+        )
         self.assertIn(
             {"event": "file_modified", "detail": {"tool": "write_file", "path": "note.txt"}},
             result.events,

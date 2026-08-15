@@ -186,7 +186,7 @@ summarizer can fold the oldest outputs into a summary
 served from a freshness-checked cache (`miniclaude/memory.py`), surfaced as
 `cache_hit` on `read_file` and measured by `cache_hits` / `cache_hit_rate`.
 
-Tools are "10 built-in + MCP pluggable": `miniclaude.mcp.MCPClient` launches
+Tools are "13 built-in + MCP pluggable": `miniclaude.mcp.MCPClient` launches
 a stdio MCP server, discovers its tools via `tools/list`, and registers them
 as `ToolDefinition`s. MCP tools default to `MUTATING` risk so they are
 subject to the same approval policy as any other tool.
